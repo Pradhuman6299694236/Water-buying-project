@@ -1,7 +1,5 @@
 // Handle CTA button click
-document.getElementById('cta-button').addEventListener('click', () => {
-  alert('Get Started button clicked! Redirect or perform an action here.');
-});
+
 
 // Handle form submission
 document.getElementById('contact-form').addEventListener('submit', (e) => {
@@ -18,11 +16,35 @@ document.getElementById('contact-form').addEventListener('submit', (e) => {
 });
 
 let buyButtons = document.querySelectorAll(".add-to-cart");
-// buyButtons.forEach((button) => {
-//   button.addEventListener("click", () => {
-//     const phoneNumber = "6299694236";
-//     const message = encodeURIComponent("Hello, I am order 20 ltr water provide me according to the policy within 15 min...");
-//     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-//     window.location.href = whatsappUrl;
-// });
-// });
+let ctaButton = document.querySelector("#cta-button");
+
+
+  ctaButton.addEventListener("click", () => {
+    const phoneNumber = "6299694236";
+    const message = encodeURIComponent("Hello, I am order 20 ltr water provide me according to the policy within 15 min...");
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+    window.location.href = whatsappUrl;
+});
+
+
+let getUserLocation = ()=>{
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+      //success callback
+      (position)=>{
+        console.log(`Latitude: ${position.coords.latitude}, Longitude : ${position.coords.longitude}`);
+      },
+      (error)=>{
+        console.error(`Error : ${error.message}`);
+      },
+
+      {timeout: 20000, enableHighAccuracy: true}
+    )
+  }
+}
+
+buyButtons.forEach((button)=>{
+  button.addEventListener("click",()=>{
+  getUserLocation();
+})
+})
