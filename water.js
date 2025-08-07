@@ -17,12 +17,12 @@ document.getElementById('contact-form').addEventListener('submit', (e) => {
   }
 });
 
-let buyButtons = document.querySelectorAll(".add-to-cart")
-buyButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    const phoneNumber = "6299694236";
-    const message = encodeURIComponent("Hello, I am order 20 ltr water provide me according to the policy within 15 min...");
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-    window.location.href = whatsappUrl;
-  });
-});
+let buyButtons = document.querySelectorAll(".add-to-cart");
+// buyButtons.forEach((button) => {
+//   button.addEventListener("click", () => {
+//     const phoneNumber = "6299694236";
+//     const message = encodeURIComponent("Hello, I am order 20 ltr water provide me according to the policy within 15 min...");
+//     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+//     window.location.href = whatsappUrl;
+// });
+// });
