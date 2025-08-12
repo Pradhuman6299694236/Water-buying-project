@@ -118,7 +118,7 @@ nav a:hover {
     transition: transform 0.3s ease;
 }
 .product-card:hover{
-    transform: translateY(-5px);
+    transform: translateY(0px);
 }
 .product-image{
   width: 50%;
@@ -222,3 +222,29 @@ footer {
   }
 }
 
+#distributor-section{
+  display: flex;
+  justify-content: center;
+  align-content: center;
+  background-color: #bae6ff;
+}
+
+
+
+#distributor-section #distributor{
+  text-decoration: none;
+  font-weight: bold;
+  font-style: italic;
+  border: none;
+  padding: 50px;
+  font-size: 2rem;
+  background-color:#bae6ff ;
+}
+#distributor-section #distributor:hover{
+  font-size: 2.2rem ;
+  color: rgb(240, 147, 147);
+}
+#distributor-section #distributor:active{
+  font-size: 2.3rem ;
+  color: rgb(212, 89, 89);
+}
