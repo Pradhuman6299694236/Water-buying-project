@@ -19,7 +19,11 @@ let getDistributorLocation = async () => {
       //success callback
       (position) => {
         console.log(`Latitude: ${position.coords.latitude}, Longitude : ${position.coords.longitude}`);
-        window.location.href = "distributor.html";
+        const distributorLoc = {
+          "lati" : position.coords.latitude,
+          "long" : position.coords.longitude
+        } 
+        window.location.href = "distributorRegistration.html";
       },
       (error) => {
         console.error(`Error : ${error.message}`);
@@ -30,13 +34,23 @@ let getDistributorLocation = async () => {
   }
 };
 
+const firebaseConfig = {
+  apiKey : "AIzaSyDsdEsybJ_ylCu4m2Y3l-QY5pJxwXZPCE4",
+  authDomain :  "water-distribution-37c04.firebaseapp.com",
+  projectId : "water-distribution-37c04",
+  storageBucket : "water-distribution-37c04.firebasestorage.app",
+  messagingSenderId : "424767171321",
+  appId : "1:424767171321:web:0d30b64169293edb41d028",
+  measurementId : "G-M7K1HSR1XY"
+};
+
 let getUserLocation = () => {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       //success callback
       (position) => {
         console.log(`Latitude: ${position.coords.latitude}, Longitude : ${position.coords.longitude}`);
-
+        
       },
       (error) => {
         console.error(`Error : ${error.message}`);

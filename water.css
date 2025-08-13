@@ -31,6 +31,9 @@ header {
     display: block;
     border-radius: 50%;
 }
+header{
+  background-color: black;
+}
 
 nav {
   display: flex;
@@ -38,6 +41,7 @@ nav {
   align-items: center;
   max-width: 1200px;
   margin: 0 auto;
+  background-color: black;
 }
 
 .logo {
@@ -222,29 +226,25 @@ footer {
   }
 }
 
-#distributor-section{
-  display: flex;
-  justify-content: center;
-  align-content: center;
-  background-color: #bae6ff;
-}
 
 
 
-#distributor-section #distributor{
+
+#distributor{
   text-decoration: none;
   font-weight: bold;
   font-style: italic;
-  border: none;
-  padding: 50px;
-  font-size: 2rem;
-  background-color:#bae6ff ;
+  border: #d18e00 solid;
+  font-size:1rem;
+  background-color:black ;
+  color: white;
 }
-#distributor-section #distributor:hover{
-  font-size: 2.2rem ;
+#distributor:hover{
+  font-size: 1rem ;
   color: rgb(240, 147, 147);
 }
-#distributor-section #distributor:active{
-  font-size: 2.3rem ;
+#distributor:active{
+  font-size: 1.1rem ;
   color: rgb(212, 89, 89);
+  
 }
