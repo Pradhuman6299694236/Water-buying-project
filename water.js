@@ -1,6 +1,8 @@
 // Handle CTA button click
 
-
+window.onload = () => {
+  window.scrollTo(0, 0);
+}
 // Handle form submission
 
 
@@ -18,61 +20,29 @@ let getDistributorLocation = async () => {
       (position) => {
         console.log(`Latitude: ${position.coords.latitude}, Longitude : ${position.coords.longitude}`);
         const distributorLoc = {
-          "lati": position.coords.latitude,
-          "long": position.coords.longitude
-        }
+          "lati" : position.coords.latitude,
+          "long" : position.coords.longitude
+        } 
         window.location.href = "distributorRegistration.html";
       },
       (error) => {
         console.error(`Error : ${error.message}`);
       },
 
-      { timeout: 20000, enableHighAccuracy: true }
+      {timeout: 20000, enableHighAccuracy: true}
     )
   }
 };
 
-// const firebaseConfig = {
-//   apiKey : "AIzaSyDsdEsybJ_ylCu4m2Y3l-QY5pJxwXZPCE4",
-//   authDomain :  "water-distribution-37c04.firebaseapp.com",
-//   projectId : "water-distribution-37c04",
-//   storageBucket : "water-distribution-37c04.firebasestorage.app",
-//   messagingSenderId : "424767171321",
-//   appId : "1:424767171321:web:0d30b64169293edb41d028",
-//   measurementId : "G-M7K1HSR1XY"
-// };
-
-// Import needed Firebase services from CDN
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-
-
 const firebaseConfig = {
-  apiKey: "AIzaSyDsdEsybJ_ylCu4m2Y3l-QY5pJxwXZPCE4",
-  authDomain: "water-distribution-37c04.firebaseapp.com",
-  projectId: "water-distribution-37c04",
-  storageBucket: "water-distribution-37c04.firebasestorage.app",
-  messagingSenderId: "424767171321",
-  appId: "1:424767171321:web:0d30b64169293edb41d028",
-  measurementId: "G-M7K1HSR1XY"
-
+  apiKey : "AIzaSyDsdEsybJ_ylCu4m2Y3l-QY5pJxwXZPCE4",
+  authDomain :  "water-distribution-37c04.firebaseapp.com",
+  projectId : "water-distribution-37c04",
+  storageBucket : "water-distribution-37c04.firebasestorage.app",
+  messagingSenderId : "424767171321",
+  appId : "1:424767171321:web:0d30b64169293edb41d028",
+  measurementId : "G-M7K1HSR1XY"
 };
-const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-try {
-    const snapshot = await getDocs(collection(db, "Abhi_Testing"));
-    console.log("✅ Firestore connected, documents found:", snapshot.size);
-    snapshot.forEach(doc => console.log(doc.id, "=>", doc.data()));
-  } catch (error) {
-    console.error("❌ Firestore connection failed:", error);
-  }
-
-
-
-
-
 
 let getUserLocation = () => {
   if (navigator.geolocation) {
@@ -80,7 +50,7 @@ let getUserLocation = () => {
       //success callback
       (position) => {
         console.log(`Latitude: ${position.coords.latitude}, Longitude : ${position.coords.longitude}`);
-
+        
       },
       (error) => {
         console.error(`Error : ${error.message}`);
@@ -119,17 +89,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (buyButtons) {
     buyButtons.forEach((button) => {
-      button.addEventListener("click", () => {
+      button.addEventListener("click",() => {
         getUserLocation();
       })
     });
   }
 
-
+  
   if (registrationButton) {
     registrationButton.addEventListener("click", async () => {
       await getDistributorLocation();
-
+      
     });
   };
 });
