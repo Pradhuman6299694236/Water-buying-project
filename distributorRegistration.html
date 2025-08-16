@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributor Registration</title>
+    <script src="water.js"></script>
+    <style>
+        #distributor-registration {
+            display: flex;
+            justify-content: center;
+        }
+
+        #distributor-form {
+            border-radius: 0.5rem;
+            border: black solid;
+            padding: 100px
+        }
+        
+        body{
+            background-color: rgb(180, 198, 199);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="distributor-registration">
+        <form id="distributor-form">
+            <div class="registration-form">
+                <label for="distributor-name">Name</label>
+                <input type="text" id="distributor-name" name="distributor-name" required>
+            </div>
+
+            <br>
+
+            <div class="registration-form">
+                <label for="distributor-email">Email</label>
+                <input type="email" id="distributor-email" name="distributor-email" required>
+            </div>
+            <br>
+            <div class="registration-form">
+                <label for="distributor-mobile">Mobile No.</label>
+                <input type="tel" id="distributor-mobile" name="distributor-mobile" required>
+            </div>
+            
+            <br>
+            <div class="registration-form">
+                <button type="submit" id="registration-submit">Register</button>
+            </div>
+            
+
+
+        </form>
+    </div>
+
+    
+</body>
+
+</html>
