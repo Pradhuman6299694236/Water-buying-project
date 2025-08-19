@@ -1,60 +1,86 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Distributor Registration</title>
-    <script src="water.js"></script>
+    <link rel="stylesheet" href="water.css">
     <style>
         #distributor-registration {
             display: flex;
             justify-content: center;
+            align-items: center;
+            min-height: 100vh;
         }
 
         #distributor-form {
             border-radius: 0.5rem;
-            border: black solid;
-            padding: 100px
+            border: 2px solid black;
+            padding: 2rem;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 100%;
         }
-        
-        body{
+
+        body {
             background-color: rgb(180, 198, 199);
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        .registration-form {
+            margin-bottom: 1rem;
+        }
+
+        .registration-form label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+
+        .registration-form input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 0.25rem;
+        }
+
+        .registration-form button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+        }
+
+        .registration-form button:hover {
+            background-color: #0056b3;
         }
     </style>
 </head>
-
 <body>
     <div id="distributor-registration">
-        <form id="distributor-form">
+        <form id="distributor-form" class="registration-form">
             <div class="registration-form">
                 <label for="distributor-name">Name</label>
                 <input type="text" id="distributor-name" name="distributor-name" required>
             </div>
-
-            <br>
-
             <div class="registration-form">
                 <label for="distributor-email">Email</label>
                 <input type="email" id="distributor-email" name="distributor-email" required>
             </div>
-            <br>
             <div class="registration-form">
                 <label for="distributor-mobile">Mobile No.</label>
-                <input type="tel" id="distributor-mobile" name="distributor-mobile" required>
+                <input type="tel" id="distributor-mobile" name="distributor-mobile" required pattern="[0-9]{10}">
             </div>
-            
-            <br>
             <div class="registration-form">
                 <button type="submit" id="registration-submit">Register</button>
             </div>
-            
-
-
         </form>
     </div>
-
-    
+    <script type="module" src="water2.js"></script>
 </body>
-
 </html>
