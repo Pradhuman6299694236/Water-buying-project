@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { getFirestore, collection, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, setDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDsdEsybJ_ylCu4m2Y3l-QY5pJxwXZPCE4",
@@ -54,7 +54,7 @@ let getDistributorLocation = async () => {
                     timestamp: new Date()
                 };
                 console.log("Distributor location retrieved:", distributorLoc);
-                // loadingIndicator.remove();
+                loadingIndicator.remove();
                 resolve(distributorLoc);
             },
             (error) => {
@@ -97,7 +97,7 @@ let getUserLocation = async () => {
                     timestamp: new Date()
                 };
                 try {
-                    await addDoc(collection(db, "user_locations"), userLoc);
+                    await setDoc(doc(db, "user_locations", `user_${new Date().toISOString()}`), userLoc);
                     console.log("User location saved:", userLoc);
                     alert("Location saved for your order!");
                     loadingIndicator.remove();
@@ -143,7 +143,7 @@ document.addEventListener("DOMContentLoaded", () => {
             button.addEventListener("click", async () => {
                 console.log(`Buy button ${index + 1} clicked`);
                 try {
-                    // await getUserLocation();
+                    await getUserLocation();
                     const product = index === 0 ? "20L Bottle 1" : "20L Bottle 2";
                     const phoneNumber = "+916299694236";
                     const message = encodeURIComponent(`Hello, I want to order ${product}.`);
@@ -156,28 +156,13 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-  if (ctaButton) {
+    if (ctaButton) {
         ctaButton.addEventListener("click", () => {
             console.log("CTA button clicked");
             const phoneNumber = "+916299694236";
             const message = encodeURIComponent("Hello, I want to order 20 ltr water, please provide it within 15 minutes.");
             const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-            console.log("Redirecting to WhatsApp:", whatsappUrl);
-            const loadingIndicator = document.createElement("p");
-            loadingIndicator.textContent = "Opening WhatsApp...";
-            loadingIndicator.style.position = "fixed";
-            loadingIndicator.style.top = "50%";
-            loadingIndicator.style.left = "50%";
-            loadingIndicator.style.transform = "translate(-50%, -50%)";
-            loadingIndicator.style.background = "rgba(0, 0, 0, 0.8)";
-            loadingIndicator.style.color = "white";
-            loadingIndicator.style.padding = "10px";
-            loadingIndicator.style.borderRadius = "5px";
-            document.body.appendChild(loadingIndicator);
-            setTimeout(() => {
-                loadingIndicator.remove();
-                window.location.href = whatsappUrl;
-            }, 10000);
+            window.location.href = whatsappUrl;
         });
     }
 
@@ -195,13 +180,19 @@ document.addEventListener("DOMContentLoaded", () => {
             const email = document.getElementById("email").value;
 
             if (name && email) {
+                if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
+                    alert("Please enter a valid email address.");
+                    console.log("Invalid email:", email);
+                    return;
+                }
                 try {
-                    await addDoc(collection(db, "contacts"), {
+                    const docId = email.replace(/[^a-zA-Z0-9._%+-@]/g, "_"); // Sanitize email for document ID
+                    await setDoc(doc(db, "contacts", docId), {
                         name,
                         email,
                         timestamp: new Date()
                     });
-                    console.log("Contact data saved:", { name, email });
+                    console.log("Contact data saved:", { name, email }, "Document ID:", docId);
                     alert(`Thank you, ${name}! We'll contact you at ${email}.`);
                     contactForm.reset();
                 } catch (error) {
@@ -218,7 +209,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (distributorForm) {
         distributorForm.addEventListener("submit", async (e) => {
             e.preventDefault();
-            console.log("Distributor form submitted");
+            // console.log("Distributor form submitted");
             const name = document.getElementById("distributor-name").value;
             const email = document.getElementById("distributor-email").value;
             const mobile = document.getElementById("distributor-mobile").value;
@@ -229,12 +220,25 @@ document.addEventListener("DOMContentLoaded", () => {
                     console.log("Invalid mobile number:", mobile);
                     return;
                 }
+                if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-znamibia0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
+                    alert("Please enter a valid email address.");
+                    console.log("Invalid email:", email);
+                    return;
+                }
                 try {
                     const location = await getDistributorLocation();
                     if (!location || typeof location.lati === "undefined" || typeof location.long === "undefined") {
                         throw new Error("Invalid location data received");
                     }
-                    await addDoc(collection(db, "distributors"), {
+                    const docId = email.replace(/[^a-zA-Z0-9._%+-@]/g, "_"); // Sanitize email for document ID
+                    const docRef = doc(db, "distributors", docId);
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists()) {
+                        alert("This email is already registered. Please use a different email.");
+                        console.log("Duplicate email:", email);
+                        return;
+                    }
+                    await setDoc(docRef, {
                         name,
                         email,
                         mobile,
@@ -245,7 +249,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         },
                         registrationTimestamp: new Date()
                     });
-                    console.log("Distributor data saved:", { name, email, mobile, location });
+                    console.log("Distributor data saved:", { name, email, mobile, location }, "Document ID:", docId);
                     alert(`Thank you, ${name}! Your distributor registration is complete.`);
                     distributorForm.reset();
                 } catch (error) {
@@ -256,7 +260,45 @@ document.addEventListener("DOMContentLoaded", () => {
                 alert("Please fill in all fields.");
                 console.log("Missing fields:", { name, email, mobile });
             }
-            window.location.href = "index.html";
         });
     }
+
+
+// Fetch a specific distributor by document ID (email)
+// async function fetchDistributorById(docId) {
+//     try {
+//         const docRef = doc(db, "distributors", docId);
+//         const docSnap = await getDoc(docRef);
+//         if (docSnap.exists()) {
+//             console.log("✅ Distributor found:", { id: docSnap.id, ...docSnap.data() });
+//             return { id: docSnap.id, ...docSnap.data() };
+//         } else {
+//             console.log("❌ No distributor found with ID:", docId);
+//             alert("No distributor found with this email.");
+//             return null;
+//         }
+//     } catch (error) {
+//         console.error("❌ Error fetching distributor:", error);
+//         alert(`Failed to fetch distributor: ${error.message}`);
+//         return null;
+//     }
+// }
+async function fetchAllDistributors() {
+    try {
+        const snapshot = await getDocs(collection(db, "distributors"));
+        const distributors = [];
+        snapshot.forEach(doc => {
+            distributors.push({ id: doc.id, ...doc.data() });
+        });
+        console.log("✅ Distributors fetched:", distributors);
+        return distributors;
+    } catch (error) {
+        console.error("❌ Error fetching distributors:", error);
+        alert(`Failed to fetch distributors: ${error.message}`);
+        return [];
+    }
+}
+
+const distributors = fetchAllDistributors();
+console.log(distributors);
 });
