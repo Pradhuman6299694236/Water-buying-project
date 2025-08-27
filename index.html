@@ -90,66 +90,16 @@
 
 
 
-<<<<<<< HEAD
-=======
-
-
->>>>>>> 3c86788adc894150942c8ad20a65ef36a2bde585
 
     <!-- Footer -->
     <footer>
         <p>&copy; 2025 MyBrand. All rights reserved.</p>
     </footer>
-<<<<<<< HEAD
    <!-- <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase--firestore.js"></script> -->
     
  
     <script type="module" src="water2.js"></script> 
-=======
-    <!-- <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase--firestore.js"></script>
-    <script src="water.js"></script> -->
-
-    <script type="module">
-        // Import needed Firebase services from CDN
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-          import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyDsdEsybJ_ylCu4m2Y3l-QY5pJxwXZPCE4",
-            authDomain: "water-distribution-37c04.firebaseapp.com",
-            projectId: "water-distribution-37c04",
-            storageBucket: "water-distribution-37c04.firebasestorage.app",
-            messagingSenderId: "424767171321",
-            appId: "1:424767171321:web:0d30b64169293edb41d028",
-            measurementId: "G-M7K1HSR1XY"
-
-        };
-            
-
-
-        // const app = initializeApp(firebaseConfig);
-        // const db = getFirestore(app);
-
-          const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  console.log("✅ Firebase initialized");
-
-  // Test Firestore connection
-  try {
-    const snapshot = await getDocs(collection(db, "Abhi_Testing"));
-    console.log("✅ Firestore connected, documents found:", snapshot.size);
-    snapshot.forEach(doc => console.log(doc.id, "=>", doc.data()));
-  } catch (error) {
-    console.error("❌ Firestore connection failed:", error);
-  }
-    </script>
-
->>>>>>> 3c86788adc894150942c8ad20a65ef36a2bde585
 </body>
 
 </html>
