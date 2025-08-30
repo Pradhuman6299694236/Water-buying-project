@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { getFirestore, collection, getDocs, setDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDsdEsybJ_ylCu4m2Y3l-QY5pJxwXZPCE4",
@@ -13,16 +13,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Fetch distributor name by document ID (sanitized email)
-async function fetchDistributorName(docId) {
+// Fetch distributor name by email
+async function fetchDistributorName(email) {
     try {
+        const docId = email.replace(/[^a-zA-Z0-9._%+-@]/g, "_");
         const docRef = doc(db, "distributors", docId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-            // console.log("✅ Distributor name fetched:", docSnap.data().name);
+            console.log("✅ Distributor name fetched:", docSnap.data().name);
             return docSnap.data().name;
         }
-        console.log("❌ No distributor found with ID:", docId);
+        console.log("❌ No distributor found for email:", email);
         return null;
     } catch (error) {
         console.error("❌ Error fetching distributor name:", error);
@@ -32,20 +33,75 @@ async function fetchDistributorName(docId) {
 
 // Update distributor button text
 async function updateDistributorButton() {
-    const NewElement = document.createElement("h4");
     const registrationButton = document.querySelector("#distributor");
-    const email = localStorage.getItem("registeredDistributorEmail");
     if (!registrationButton) return;
-    
+    const email = localStorage.getItem("registeredDistributorEmail");
     if (!email) {
         registrationButton.textContent = "Register as Distributor";
         return;
     }
-    const docId = email.replace(/[^a-zA-Z0-9._%+-@]/g, "_");
-    const name = await fetchDistributorName(docId);
-   
+    const name = await fetchDistributorName(email);
     registrationButton.textContent = name ? `Welcome, ${name}` : "Register as Distributor";
     if (!name) localStorage.removeItem("registeredDistributorEmail");
+}
+
+// Fetch all distributor locations
+async function fetchAllDistributorLocations() {
+    try {
+        const snapshot = await getDocs(collection(db, "distributors"));
+        const locations = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.location && typeof data.location.lati === "number" && typeof data.location.long === "number") {
+                locations.push({
+                    email: data.email,
+                    name: data.name,
+                    lati: data.location.lati,
+                    long: data.location.long
+                });
+            }
+        });
+        console.log("✅ Distributor locations fetched:", locations);
+        return locations;
+    } catch (error) {
+        console.error("❌ Error fetching distributor locations:", error);
+        return [];
+    }
+}
+
+// Calculate distance using Haversine formula (in kilometers)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+// Find nearest distributor
+async function findNearestDistributor(userLat, userLon) {
+    const distributors = await fetchAllDistributorLocations();
+    if (distributors.length === 0) {
+        console.log("No distributors found.");
+        return null;
+    }
+
+    let nearest = null;
+    let minDistance = Infinity;
+
+    for (const dist of distributors) {
+        const distance = calculateDistance(userLat, userLon, dist.lati, dist.long);
+        if (distance < minDistance) {
+            minDistance = distance;
+            nearest = dist;
+        }
+    }
+
+    console.log(`Nearest distributor: ${nearest?.name} at ${minDistance.toFixed(2)} km`);
+    return nearest;
 }
 
 let getDistributorLocation = async () => {
@@ -122,7 +178,6 @@ let getUserLocation = async () => {
                 try {
                     await setDoc(doc(db, "user_locations", `user_${new Date().toISOString()}`), userLoc);
                     console.log("User location saved:", userLoc);
-                    alert("Location saved for your order!");
                     loadingIndicator.remove();
                     resolve(userLoc);
                 } catch (error) {
@@ -160,7 +215,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let contactForm = document.getElementById("contact-form");
     let distributorForm = document.getElementById("distributor-form");
 
-    // Update button text on page load
+    // Update button on page load
     updateDistributorButton();
 
     // if (!buyButtons.length) console.log("No 'Buy Now' buttons found.");
@@ -174,12 +229,19 @@ document.addEventListener("DOMContentLoaded", () => {
             button.addEventListener("click", async () => {
                 console.log(`Buy button ${index + 1} clicked`);
                 try {
-                    await getUserLocation();
-                    const product = index === 0 ? "20L Bottle 1" : "20L Bottle 2";
-                    const phoneNumber = "+916299694236";
-                    const message = encodeURIComponent(`Hello, I want to order ${product}.`);
-                    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-                    window.location.href = whatsappUrl;
+                    const userLoc = await getUserLocation();
+                    const nearestDistributor = await findNearestDistributor(userLoc.latitude, userLoc.longitude);
+                    if (!nearestDistributor) {
+                        alert("No distributors available. Please try again later.");
+                        console.log("No distributors available.");
+                        return;
+                    }
+                    // const product = index === 0 ? "20L Bottle 1" : "20L Bottle 2";
+                    // const phoneNumber = "+916299694236";
+                    // const message = encodeURIComponent(`Hello, I want to order ${product} from ${nearestDistributor.name}.`);
+                    // const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+                    // console.log(`Redirecting to WhatsApp: ${whatsappUrl}`);
+                    // window.location.href = whatsappUrl;
                 } catch (error) {
                     console.error("Buy button error:", error);
                 }
@@ -278,7 +340,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             long: location.long,
                             timestamp: location.timestamp || new Date()
                         },
-                       
+                        registrationTimestamp: new Date()
                     });
                     console.log("Distributor data saved:", { name, email, mobile, location }, "Document ID:", docId);
                     alert(`Thank you, ${name}! Your distributor registration is complete.`);
@@ -296,4 +358,3 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 });
-
