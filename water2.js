@@ -175,17 +175,17 @@ let getUserLocation = async () => {
                     longitude: position.coords.longitude,
                     timestamp: new Date()
                 };
-                try {
-                    await setDoc(doc(db, "user_locations", `user_${new Date().toISOString()}`), userLoc);
-                    console.log("User location saved:", userLoc);
-                    loadingIndicator.remove();
-                    resolve(userLoc);
-                } catch (error) {
-                    console.error("Error saving user location:", error);
-                    alert("Failed to save location. Please try again.");
-                    loadingIndicator.remove();
-                    reject(error);
-                }
+                // try {
+                //     await setDoc(doc(db, "user_locations", `user_${new Date().toISOString()}`), userLoc);
+                //     console.log("User location saved:", userLoc);
+                //     loadingIndicator.remove();
+                //     resolve(userLoc);
+                // } catch (error) {
+                //     console.error("Error saving user location:", error);
+                //     alert("Failed to save location. Please try again.");
+                //     loadingIndicator.remove();
+                //     reject(error);
+                // }
             },
             (error) => {
                 console.error(`Geolocation error: ${error.message}`);
@@ -227,7 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (buyButtons.length) {
         buyButtons.forEach((button, index) => {
             button.addEventListener("click", async () => {
-                console.log(`Buy button ${index + 1} clicked`);
+                // console.log(`Buy button ${index + 1} clicked`);
                 try {
                     const userLoc = await getUserLocation();
                     const nearestDistributor = await findNearestDistributor(userLoc.latitude, userLoc.longitude);
