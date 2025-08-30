@@ -1,6 +1,14 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
+const hamburger = document.querySelector('.hamburger');
+const navList = document.querySelector('.nav-list');
+hamburger.addEventListener('click', () => {
+  const isExpanded = hamburger.getAttribute('aria-expanded') === 'true';
+  hamburger.setAttribute('aria-expanded', !isExpanded);
+  navList.classList.toggle('active');
+});
+
 const firebaseConfig = {
     apiKey: "AIzaSyDsdEsybJ_ylCu4m2Y3l-QY5pJxwXZPCE4",
     authDomain: "water-distribution-37c04.firebaseapp.com",
@@ -357,4 +365,5 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+    
 });

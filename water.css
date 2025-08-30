@@ -10,6 +10,7 @@ body {
   line-height: 1.6;
 }
 
+
 /* Header */
 header {
   background: #333;
@@ -35,19 +36,64 @@ header{
   background-color: black;
 }
 
-nav {
+.navbar {
+  width: 100%;
+  padding: 10px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  max-width: 1200px;
-  margin: 0 auto;
+  
+}
+
+.hamburger {
+  font-size: 22px;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  padding: 10px;
+  margin-left: 40rem;
   background-color: black;
 }
+
+.nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: none; /* Hidden by default */
+  flex-direction: column; /* Stack items vertically */
+}
+
+.nav-list.active {
+  display: flex; /* Show when active class is added */
+}
+
+.nav-list li {
+  padding: 10px;
+}
+
+.nav-list a {
+  color: white;
+  text-decoration: none;
+  display: block; /* Full-width clickable area */
+}
+
+.nav-list a:hover {
+  background-color: #555;
+}
+
+/* Optional: Show navbar items horizontally on larger screens */
+@media (min-width: 768px) {
+  .hamburger {
+    display:block; /* Hide hamburger on large screens */
+  }
+  
+}
+
 
 .logo {
   font-size: 1.5rem;
   font-weight: bold;
 }
+
 
 nav ul {
   list-style: none;
@@ -226,10 +272,6 @@ footer {
   }
 }
 
-
-
-
-
 #distributor{
   text-decoration: none;
   font-weight: bold;
@@ -238,6 +280,7 @@ footer {
   font-size:1rem;
   background-color:black ;
   color: white;
+  margin-left: 40rem;
 }
 #distributor:hover{
   font-size: 1rem ;
