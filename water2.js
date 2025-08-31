@@ -1,14 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
-const hamburger = document.querySelector('.hamburger');
-const navList = document.querySelector('.nav-list');
-hamburger.addEventListener('click', () => {
-  const isExpanded = hamburger.getAttribute('aria-expanded') === 'true';
-  hamburger.setAttribute('aria-expanded', !isExpanded);
-  navList.classList.toggle('active');
-});
-
 const firebaseConfig = {
     apiKey: "AIzaSyDsdEsybJ_ylCu4m2Y3l-QY5pJxwXZPCE4",
     authDomain: "water-distribution-37c04.firebaseapp.com",
@@ -39,17 +31,17 @@ async function fetchDistributorName(email) {
     }
 }
 
-// Update distributor button text
+// Update distributor link text
 async function updateDistributorButton() {
-    const registrationButton = document.querySelector("#distributor");
-    if (!registrationButton) return;
+    const registrationLink = document.querySelector("#distributor");
+    if (!registrationLink) return;
     const email = localStorage.getItem("registeredDistributorEmail");
     if (!email) {
-        registrationButton.textContent = "Register as Distributor";
+        registrationLink.textContent = "Register as Distributor";
         return;
     }
     const name = await fetchDistributorName(email);
-    registrationButton.textContent = name ? `Welcome, ${name}` : "Register as Distributor";
+    registrationLink.textContent = name ? `Welcome, ${name}` : "Register as Distributor";
     if (!name) localStorage.removeItem("registeredDistributorEmail");
 }
 
@@ -60,10 +52,11 @@ async function fetchAllDistributorLocations() {
         const locations = [];
         snapshot.forEach(doc => {
             const data = doc.data();
-            if (data.location && typeof data.location.lati === "number" && typeof data.location.long === "number") {
+            if (data.location && typeof data.location.lati === "number" && typeof data.location.long === "number" && data.mobile) {
                 locations.push({
                     email: data.email,
                     name: data.name,
+                    mobile: data.mobile,
                     lati: data.location.lati,
                     long: data.location.long
                 });
@@ -116,7 +109,7 @@ let getDistributorLocation = async () => {
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
             console.error("Geolocation not supported by browser");
-            alert("Geolocation is not supported by your browser.");
+            alert("Geolocation is not supported by your browser. Please enable it or use a compatible device.");
             reject(new Error("Geolocation not supported"));
             return;
         }
@@ -129,8 +122,10 @@ let getDistributorLocation = async () => {
         loadingIndicator.style.transform = "translate(-50%, -50%)";
         loadingIndicator.style.background = "rgba(0, 0, 0, 0.8)";
         loadingIndicator.style.color = "white";
-        loadingIndicator.style.padding = "10px";
-        loadingIndicator.style.borderRadius = "5px";
+        loadingIndicator.style.padding = "15px";
+        loadingIndicator.style.borderRadius = "8px";
+        loadingIndicator.style.fontSize = "1rem";
+        loadingIndicator.style.zIndex = "1000";
         document.body.appendChild(loadingIndicator);
 
         navigator.geolocation.getCurrentPosition(
@@ -146,11 +141,11 @@ let getDistributorLocation = async () => {
             },
             (error) => {
                 console.error(`Geolocation error: ${error.message}`);
-                alert(`Location access failed: ${error.message}. Please enable location services to register as a distributor.`);
+                alert(`Location access failed: ${error.message}. Please enable location services in your device settings.`);
                 loadingIndicator.remove();
                 reject(error);
             },
-            { timeout: 20000, enableHighAccuracy: true }
+            { timeout: 30000, enableHighAccuracy: true, maximumAge: 0 }
         );
     });
 };
@@ -159,7 +154,7 @@ let getUserLocation = async () => {
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
             console.error("Geolocation not supported by browser");
-            alert("Geolocation is not supported by your browser.");
+            alert("Geolocation is not supported by your browser. Please enable it or use a compatible device.");
             reject(new Error("Geolocation not supported"));
             return;
         }
@@ -172,8 +167,10 @@ let getUserLocation = async () => {
         loadingIndicator.style.transform = "translate(-50%, -50%)";
         loadingIndicator.style.background = "rgba(0, 0, 0, 0.8)";
         loadingIndicator.style.color = "white";
-        loadingIndicator.style.padding = "10px";
-        loadingIndicator.style.borderRadius = "5px";
+        loadingIndicator.style.padding = "15px";
+        loadingIndicator.style.borderRadius = "8px";
+        loadingIndicator.style.fontSize = "1rem";
+        loadingIndicator.style.zIndex = "1000";
         document.body.appendChild(loadingIndicator);
 
         navigator.geolocation.getCurrentPosition(
@@ -183,25 +180,25 @@ let getUserLocation = async () => {
                     longitude: position.coords.longitude,
                     timestamp: new Date()
                 };
-                // try {
-                //     await setDoc(doc(db, "user_locations", `user_${new Date().toISOString()}`), userLoc);
-                //     console.log("User location saved:", userLoc);
-                //     loadingIndicator.remove();
-                //     resolve(userLoc);
-                // } catch (error) {
-                //     console.error("Error saving user location:", error);
-                //     alert("Failed to save location. Please try again.");
-                //     loadingIndicator.remove();
-                //     reject(error);
-                // }
+                try {
+                    await setDoc(doc(db, "user_locations", `user_${new Date().toISOString()}`), userLoc);
+                    console.log("User location saved:", userLoc);
+                    loadingIndicator.remove();
+                    resolve(userLoc);
+                } catch (error) {
+                    console.error("Error saving user location:", error);
+                    alert("Failed to save location. Please try again.");
+                    loadingIndicator.remove();
+                    reject(error);
+                }
             },
             (error) => {
                 console.error(`Geolocation error: ${error.message}`);
-                alert(`Location access failed: ${error.message}. Please enable location services.`);
+                alert(`Location access failed: ${error.message}. Please enable location services in your device settings.`);
                 loadingIndicator.remove();
                 reject(error);
             },
-            { timeout: 20000, enableHighAccuracy: true }
+            { timeout: 30000, enableHighAccuracy: true, maximumAge: 0 }
         );
     });
 };
@@ -219,23 +216,38 @@ let changepage2 = () => {
 document.addEventListener("DOMContentLoaded", () => {
     let buyButtons = document.querySelectorAll(".add-to-cart");
     let ctaButton = document.querySelector("#cta-button");
-    let registrationButton = document.querySelector("#distributor");
+    let registrationLink = document.querySelector("#distributor");
+    let logoutLink = document.querySelector("#logout");
     let contactForm = document.getElementById("contact-form");
     let distributorForm = document.getElementById("distributor-form");
 
-    // Update button on page load
+    // Update distributor link on page load
     updateDistributorButton();
 
-    // if (!buyButtons.length) console.log("No 'Buy Now' buttons found.");
-    // if (!ctaButton) console.log("CTA button (#cta-button) not found.");
-    // if (!registrationButton) console.log("Distributor button (#distributor) not found.");
-    // if (!contactForm) console.log("Contact form (#contact-form) not found.");
-    // if (!distributorForm) console.log("Distributor form (#distributor-form) not found.");
+    if (!buyButtons.length) console.log("No 'Buy Now' buttons found.");
+    if (!ctaButton) console.log("CTA button (#cta-button) not found.");
+    if (!registrationLink) console.log("Distributor link (#distributor) not found.");
+    if (!logoutLink) console.log("Logout link (#logout) not found.");
+    if (!contactForm) console.log("Contact form (#contact-form) not found.");
+    if (!distributorForm) console.log("Distributor form (#distributor-form) not found.");
 
+        const hamburger = document.querySelector('.navbar .hamburger');
+    const navList = document.querySelector('.nav-list');
+    if(hamburger){
+        hamburger.addEventListener('click', () => {
+        const isExpanded = hamburger.getAttribute('aria-expanded') === 'true';
+        hamburger.setAttribute('aria-expanded', !isExpanded);
+        navList.classList.toggle('active');
+    
+    
+    });
+    }
+
+    
     if (buyButtons.length) {
         buyButtons.forEach((button, index) => {
             button.addEventListener("click", async () => {
-                // console.log(`Buy button ${index + 1} clicked`);
+                console.log(`Buy button ${index + 1} clicked`);
                 try {
                     const userLoc = await getUserLocation();
                     const nearestDistributor = await findNearestDistributor(userLoc.latitude, userLoc.longitude);
@@ -244,14 +256,20 @@ document.addEventListener("DOMContentLoaded", () => {
                         console.log("No distributors available.");
                         return;
                     }
-                    // const product = index === 0 ? "20L Bottle 1" : "20L Bottle 2";
-                    // const phoneNumber = "+916299694236";
-                    // const message = encodeURIComponent(`Hello, I want to order ${product} from ${nearestDistributor.name}.`);
-                    // const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-                    // console.log(`Redirecting to WhatsApp: ${whatsappUrl}`);
-                    // window.location.href = whatsappUrl;
+                    if (!/^[0-9]{10}$/.test(nearestDistributor.mobile)) {
+                        alert("Invalid mobile number for the nearest distributor. Please contact support.");
+                        console.log("Invalid mobile number:", nearestDistributor.mobile);
+                        return;
+                    }
+                    const product = index === 0 ? "20L Bottle 1" : "20L Bottle 1";
+                    const phoneNumber = `+91${nearestDistributor.mobile}`;
+                    const message = encodeURIComponent(`Hello, ${nearestDistributor.name}! I want to order ${product}.`);
+                    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+                    console.log(`Notifying nearest distributor: ${nearestDistributor.name}, Mobile: ${phoneNumber}, URL: ${whatsappUrl}`);
+                    window.location.href = whatsappUrl;
                 } catch (error) {
                     console.error("Buy button error:", error);
+                    alert("Failed to process order. Please try again.");
                 }
             });
         });
@@ -267,9 +285,28 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    if (registrationButton) {
-        registrationButton.addEventListener("click", () => {
-            changepage();
+    if (registrationLink) {
+        registrationLink.addEventListener("click", (e) => {
+            const email = localStorage.getItem("registeredDistributorEmail");
+            if (email) {
+                e.preventDefault(); // Prevent navigation if already registered
+                alert("You are already registered as a distributor.");
+            } else {
+                changepage();
+            }
+        });
+    }
+
+    if (logoutLink) {
+        logoutLink.addEventListener("click", (e) => {
+            e.preventDefault();
+            localStorage.removeItem("registeredDistributorEmail");
+            const registrationLink = document.querySelector("#distributor");
+            if (registrationLink) {
+                registrationLink.textContent = "Register as Distributor";
+            }
+            console.log("Logged out, localStorage cleared.");
+            alert("You have been logged out.");
         });
     }
 
@@ -365,5 +402,4 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
-    
 });
