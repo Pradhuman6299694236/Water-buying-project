@@ -135,7 +135,7 @@ let getDistributorLocation = async () => {
                     long: position.coords.longitude,
                     timestamp: new Date()
                 };
-                console.log("Distributor location retrieved:", distributorLoc);
+                // console.log("Distributor location retrieved:", distributorLoc);
                 loadingIndicator.remove();
                 resolve(distributorLoc);
             },
@@ -180,17 +180,10 @@ let getUserLocation = async () => {
                     longitude: position.coords.longitude,
                     timestamp: new Date()
                 };
-                try {
-                    await setDoc(doc(db, "user_locations", `user_${new Date().toISOString()}`), userLoc);
-                    console.log("User location saved:", userLoc);
-                    loadingIndicator.remove();
-                    resolve(userLoc);
-                } catch (error) {
-                    console.error("Error saving user location:", error);
-                    alert("Failed to save location. Please try again.");
-                    loadingIndicator.remove();
-                    reject(error);
-                }
+                localStorage.setItem("customerLocation", JSON.stringify(userLoc));
+                // console.log("Customer location saved to localStorage:", userLoc);
+                loadingIndicator.remove();
+                resolve(userLoc);
             },
             (error) => {
                 console.error(`Geolocation error: ${error.message}`);
@@ -200,6 +193,17 @@ let getUserLocation = async () => {
             },
             { timeout: 30000, enableHighAccuracy: true, maximumAge: 0 }
         );
+
+        const storedLocation = localStorage.getItem("customerLocation");
+        if (storedLocation) {
+            const customerLoc = JSON.parse(storedLocation);
+            if (customerLoc.latitude && customerLoc.longitude && customerLoc.timestamp) {
+                console.log("Using cached customer location from localStorage:", customerLoc);
+                resolve(customerLoc);
+                return;
+            }
+        };
+
     });
 };
 
@@ -224,12 +228,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // Update distributor link on page load
     updateDistributorButton();
 
-    if (!buyButtons.length) console.log("No 'Buy Now' buttons found.");
-    if (!ctaButton) console.log("CTA button (#cta-button) not found.");
-    if (!registrationLink) console.log("Distributor link (#distributor) not found.");
-    if (!logoutLink) console.log("Logout link (#logout) not found.");
-    if (!contactForm) console.log("Contact form (#contact-form) not found.");
-    if (!distributorForm) console.log("Distributor form (#distributor-form) not found.");
+    // if (!buyButtons.length) console.log("No 'Buy Now' buttons found.");
+    // if (!ctaButton) console.log("CTA button (#cta-button) not found.");
+    // if (!registrationLink) console.log("Distributor link (#distributor) not found.");
+    // if (!logoutLink) console.log("Logout link (#logout) not found.");
+    // if (!contactForm) console.log("Contact form (#contact-form) not found.");
+    // if (!distributorForm) console.log("Distributor form (#distributor-form) not found.");
 
         const hamburger = document.querySelector('.navbar .hamburger');
     const navList = document.querySelector('.nav-list');
@@ -265,7 +269,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     const phoneNumber = `+91${nearestDistributor.mobile}`;
                     const message = encodeURIComponent(`Hello, ${nearestDistributor.name}! I want to order ${product}.`);
                     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-                    console.log(`Notifying nearest distributor: ${nearestDistributor.name}, Mobile: ${phoneNumber}, URL: ${whatsappUrl}`);
+                    // console.log(`Notifying nearest distributor: ${nearestDistributor.name}, Mobile: ${phoneNumber}, URL: ${whatsappUrl}`);
                     window.location.href = whatsappUrl;
                 } catch (error) {
                     console.error("Buy button error:", error);
@@ -347,7 +351,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (distributorForm) {
         distributorForm.addEventListener("submit", async (e) => {
             e.preventDefault();
-            console.log("Distributor form submitted");
+            // console.log("Distributor form submitted");
             const name = document.getElementById("distributor-name").value;
             const email = document.getElementById("distributor-email").value;
             const mobile = document.getElementById("distributor-mobile").value;
@@ -385,9 +389,9 @@ document.addEventListener("DOMContentLoaded", () => {
                             long: location.long,
                             timestamp: location.timestamp || new Date()
                         },
-                        registrationTimestamp: new Date()
+                        // registrationTimestamp: new Date()
                     });
-                    console.log("Distributor data saved:", { name, email, mobile, location }, "Document ID:", docId);
+                    // console.log("Distributor data saved:", { name, email, mobile, location }, "Document ID:", docId);
                     alert(`Thank you, ${name}! Your distributor registration is complete.`);
                     localStorage.setItem("registeredDistributorEmail", email);
                     distributorForm.reset();
