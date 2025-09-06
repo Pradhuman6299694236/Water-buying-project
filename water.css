@@ -41,6 +41,7 @@ header{
   padding: 10px;
   display: flex;
   align-items: center;
+  gap : 39rem;
   
 }
 
@@ -50,7 +51,6 @@ header{
   cursor: pointer;
   display: flex;
   padding: 10px;
-  margin-left: 40rem;
   background-color: black;
 }
 
@@ -280,7 +280,6 @@ footer {
   font-size:1rem;
   background-color:black ;
   color: white;
-  margin-left: 40rem;
 }
 #distributor:hover{
   font-size: 1rem ;
