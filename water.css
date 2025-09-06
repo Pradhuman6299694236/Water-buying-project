@@ -8,6 +8,7 @@
 body {
   font-family: Arial, sans-serif;
   line-height: 1.6;
+  margin: 0;
 }
 
 
@@ -41,7 +42,10 @@ header{
   padding: 10px;
   display: flex;
   align-items: center;
-  gap : 39rem;
+  justify-content: space-between;
+  z-index: 1000;
+  box-sizing: border-box;
+  position: sticky;
   
 }
 
@@ -60,6 +64,7 @@ header{
   margin: 0;
   display: none; /* Hidden by default */
   flex-direction: column; /* Stack items vertically */
+  justify-content: space-between;
 }
 
 .nav-list.active {
