@@ -3,84 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Distributor Registration</title>
+    <title>Distributor Dashboard - Water is Life</title>
     <link rel="stylesheet" href="water.css">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        #distributor-registration {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        #distributor-form {
-            border-radius: 0.5rem;
-            border: 2px solid black;
-            padding: 2rem;
-            background-color: white;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            max-width: 400px;
-            width: 100%;
-        }
-
         body {
-            background-color: rgb(180, 198, 199);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             margin: 0;
             font-family: Arial, sans-serif;
         }
-
-        .registration-form {
-            margin-bottom: 1rem;
-        }
-
-        .registration-form label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: bold;
-        }
-
-        .registration-form input {
-            width: 100%;
-            padding: 0.5rem;
-            border: 1px solid #ccc;
-            border-radius: 0.25rem;
-        }
-
-        .registration-form button {
-            width: 100%;
-            padding: 0.75rem;
-            background-color: #007bff;
+        
+        .dashboard-header {
+            background: rgba(0, 0, 0, 0.8);
             color: white;
-            border: none;
-            border-radius: 0.25rem;
-            cursor: pointer;
+            padding: 1rem;
+            text-align: center;
         }
-
-        .registration-form button:hover {
-            background-color: #0056b3;
+        
+        .dashboard-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .orders-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .orders-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .order-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .order-card h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+        
+        .map-container {
+            width: 100%;
+            height: 250px;
+            border: 2px solid #dee2e6;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        
+        .order-action {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .order-action:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .back-button {
+            display: inline-block;
+            margin: 20px;
+            padding: 10px 20px;
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.3s ease;
+        }
+        
+        .back-button:hover {
+            background: #5a6268;
+        }
+        
+        @media (max-width: 768px) {
+            .map-container {
+                height: 200px;
+            }
+            
+            .order-action {
+                display: block;
+                width: 100%;
+                margin: 5px 0;
+            }
         }
     </style>
 </head>
 <body>
-    <div id="distributor-registration">
-        <form id="distributor-form" class="registration-form">
-            <div class="registration-form">
-                <label for="distributor-name">Name</label>
-                <input type="text" id="distributor-name" name="distributor-name" required>
+    <header class="dashboard-header">
+        <h1>🚚 Distributor Dashboard</h1>
+        <p>Manage your water delivery orders</p>
+        <a href="index.html" class="back-button">← Back to Home</a>
+    </header>
+    
+    <div class="dashboard-container">
+        <div class="orders-section">
+            <h2>📦 Pending Orders</h2>
+            <div id="orders-list">
+                <div class="order-card" style="text-align: center; color: #6c757d;">
+                    Loading orders...
+                </div>
             </div>
-            <div class="registration-form">
-                <label for="distributor-email">Email</label>
-                <input type="email" id="distributor-email" name="distributor-email" required>
-            </div>
-            <div class="registration-form">
-                <label for="distributor-mobile">Mobile No.</label>
-                <input type="tel" id="distributor-mobile" name="distributor-mobile" required pattern="[0-9]{10}">
-            </div>
-            <div class="registration-form">
-                <button type="submit" id="registration-submit">Register</button>
-            </div>
-        </form>
+        </div>
     </div>
+
+    <!-- Firebase SDK -->
     <script type="module" src="water2.js"></script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>

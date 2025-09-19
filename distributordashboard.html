@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributor Dashboard - Water is Life</title>
+    <link rel="stylesheet" href="water.css">
+    <link rel="stylesheet" href="lib/leaflet.css" />  <!-- Local Leaflet CSS -->
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <a href="index.html#home" class="navbar-logo">
+                <img src="logo.jpeg" alt="Water is Life Logo" class="logo-image">
+            </a>
+            <div class="navbar-button">
+                <button id="distributor">Register as Distributor</button>
+            </div>
+            <button class="hamburger" aria-expanded="false" aria-controls="nav-list" aria-label="Toggle navigation">☰</button>
+            <ul id="nav-list" class="nav-list">
+                <li><a href="index.html#home">Home</a></li>
+                <li><a href="index.html#features">Features</a></li>
+                <li><a href="index.html#contact">Contact</a></li>
+                <li><a href="#" id="logout">Logout</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <section id="dashboard">
+        <h2>Pending Orders</h2>
+        <div id="debug-message" style="color: red; text-align: center; margin: 1rem;"></div>
+        <div id="orders-list"></div>
+    </section>
+
+    <footer>
+        <p>&copy; 2025 Water is Life. All rights reserved.</p>
+    </footer>
+
+    <script src="lib/leaflet.js"></script>  <!-- Local Leaflet JS -->
+    <script type="module" src="water2.js"></script>
+</body>
+</html>
