@@ -5,19 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Water is Life - Pure Water Delivery</title>
     <link rel="stylesheet" href="water.css">
-    <!-- Leaflet CSS for maps -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <meta name="description" content="Order pure, purified water delivered to your door in minutes. Fast, reliable water delivery service.">
 </head>
 <body>
     <!-- Header -->
     <header>
         <nav class="navbar">
-            <a href="#home" class="logo">
+            <a href="index.html" class="logo">
                 <img src="logo.jpeg" alt="Water is Life Logo" class="logo-image" />
             </a>
             
-            <button id="distributor" class="distributor-btn">Register as Distributor</button>
-            <button id="logout" class="logout-btn" style="display: none;">Logout</button>
+            <button id="distributor" class="distributor-btn">🚚 Register as Distributor</button>
+            <button id="logout" class="logout-btn" style="display: none;">🚪 Logout</button>
             
             <button class="hamburger" aria-expanded="false" aria-controls="nav-list">☰</button>
             <ul id="nav-list" class="nav-list">
@@ -31,72 +31,106 @@
 
     <!-- Hero Section -->
     <section id="home" class="hero">
-        <h1>Welcome to Water is Life</h1>
-        <p>Pure, Purified Water Delivered at One Click</p>
-        <button id="cta-button">📱 Book via WhatsApp</button>
-        <p id="qute">"Save water today, or tomorrow you'll pay."</p>
+        <div class="hero-content">
+            <h1>🌊 Welcome to Blue Drop</h1>
+            <p>Pure, Purified Water Delivered at One Click</p>
+            <button id="cta-button" class="cta-btn">📱 Book via WhatsApp</button>
+            <p id="quote" class="hero-quote">"Save water today, or tomorrow you'll pay."</p>
+        </div>
     </section>
 
     <!-- Products Section -->
-    <section id="products">
-        <h2>Our Products</h2>
-        <div class="product-container">
-            <div class="product-card">
-                <img src="bottle1.jpeg" alt="20L Water Bottle" class="product-image" />
-                <h3>20L Purified Water</h3>
-                <p>Best quality purified and chilled water for your family</p>
-                <p class="price">₹30 only</p>
-                <button class="add-to-cart">🛒 Buy Now</button>
-            </div>
+    <section id="products" class="products-section">
+        <div class="container">
+            <h2>Our Products</h2>
+            <div class="product-grid">
+                <div class="product-card">
+                    <div class="product-image-container">
+                        <img src="bottle1.jpeg" alt="20L Purified Water Bottle" class="product-image" />
+                    </div>
+                    <div class="product-info">
+                        <h3>20L Purified Water</h3>
+                        <p>Best quality purified and chilled water for your family</p>
+                        <div class="price-section">
+                            <span class="price">₹30</span>
+                            <span class="original-price">₹40</span>
+                        </div>
+                        <button class="add-to-cart btn-primary">🛒 Buy Now</button>
+                    </div>
+                </div>
 
-            <div class="product-card">
-                <img src="bottle2.jpeg" alt="20L Water Bottle" class="product-image" />
-                <h3>20L Premium Water</h3>
-                <p>Mineral-rich purified water with advanced filtration</p>
-                <p class="price">₹30 only</p>
-                <button class="add-to-cart">🛒 Buy Now</button>
+                <div class="product-card">
+                    <div class="product-image-container">
+                        <img src="bottle2.jpeg" alt="20L Premium Water Bottle" class="product-image" />
+                    </div>
+                    <div class="product-info">
+                        <h3>20L Premium Water</h3>
+                        <p>Mineral-rich purified water with advanced filtration</p>
+                        <div class="price-section">
+                            <span class="price">₹30</span>
+                            <span class="original-price">₹40</span>
+                        </div>
+                        <button class="add-to-cart btn-primary">🛒 Buy Now</button>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
 
     <!-- Features Section -->
-    <section id="features">
-        <h2>Why Choose Us?</h2>
-        <div class="feature-container">
-            <div class="feature">
-                <h3>🚀 Instant Booking</h3>
-                <p>Book water anytime, anywhere with just one click</p>
-            </div>
-            <div class="feature">
-                <h3>⚡ Fast Delivery</h3>
-                <p>Get your water delivered within 15-30 minutes</p>
-            </div>
-            <div class="feature">
-                <h3>🛡️ 24/7 Support</h3>
-                <p>Round-the-clock customer support for all your needs</p>
+    <section id="features" class="features-section">
+        <div class="container">
+            <h2>Why Choose Us?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🚀</div>
+                    <h3>Instant Booking</h3>
+                    <p>Book water anytime, anywhere with just one click. No waiting, no hassle.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Fast Delivery</h3>
+                    <p>Get your water delivered within 15-30 minutes. Lightning-fast service.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>24/7 Support</h3>
+                    <p>Round-the-clock customer support for all your water delivery needs.</p>
+                </div>
             </div>
         </div>
     </section>
 
     <!-- Contact Section -->
-    <section id="contact">
-        <h2>Get In Touch</h2>
-        <form id="contact-form">
-            <input type="text" id="name" placeholder="Your Name" required>
-            <input type="email" id="email" placeholder="Your Email" required>
-            <button type="submit">📧 Send Message</button>
-        </form>
+    <section id="contact" class="contact-section">
+        <div class="container">
+            <h2>Get In Touch</h2>
+            <form id="contact-form" class="contact-form">
+                <div class="form-group">
+                    <input type="text" id="name" placeholder="Your Name" required>
+                </div>
+                <div class="form-group">
+                    <input type="email" id="email" placeholder="Your Email" required>
+                </div>
+                <button type="submit" class="btn-primary">📧 Send Message</button>
+            </form>
+        </div>
     </section>
 
     <!-- Footer -->
-    <footer>
-        <p>&copy; 2025 Water is Life. Bringing purity to every home. All rights reserved.</p>
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 Water is Life. Bringing purity to every home. All rights reserved.</p>
+            <p class="footer-links">
+                <a href="#privacy">Privacy Policy</a> | 
+                <a href="#terms">Terms of Service</a> | 
+                <a href="#contact">Contact Us</a>
+            </p>
+        </div>
     </footer>
 
-    <!-- Firebase SDK -->
-    <script type="module" src="water2.js"></script>
-    
-    <!-- Leaflet JS for maps -->
+    <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module" src="water2.js"></script>
 </body>
 </html>

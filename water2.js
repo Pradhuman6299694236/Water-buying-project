@@ -1,5 +1,18 @@
+// Firebase Configuration
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs, onSnapshot, query, where, updateDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { 
+    getFirestore, 
+    doc, 
+    getDoc, 
+    setDoc, 
+    collection, 
+    getDocs, 
+    onSnapshot, 
+    query, 
+    where, 
+    updateDoc,
+    serverTimestamp 
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDsdEsybJ_ylCu4m2Y3l-QY5pJxwXZPCE4",
@@ -14,9 +27,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Global dashboard state
+// Global state
+let currentUser = null;
 let dashboardUnsubscribe = null;
-let currentDistributorEmail = null;
 
 // Debug logging
 function debugLog(message, data = null) {
@@ -26,15 +39,18 @@ function debugLog(message, data = null) {
 
 // Error handler
 function handleError(error, context = "General") {
-    console.error(`❌ [${context}] ${error.message}`, error);
-    return error.message;
+    console.error(`❌ [${context}]`, error);
+    return {
+        message: error.message || 'An unknown error occurred',
+        code: error.code || 'unknown'
+    };
 }
 
-// FIXED: Initialize maps
+// Initialize Leaflet maps
 function initializeMap(containerId, lat, lon, popupText = "") {
     try {
         if (!window.L) {
-            console.error("❌ Leaflet library not loaded");
+            console.error("❌ Leaflet not loaded");
             return false;
         }
         
@@ -45,27 +61,21 @@ function initializeMap(containerId, lat, lon, popupText = "") {
         }
         
         if (container._mapInitialized) {
-            console.log(`🗺️ Map ${containerId} already initialized`);
             return true;
         }
         
         if (!lat || !lon || isNaN(lat) || isNaN(lon)) {
-            console.warn(`⚠️ Invalid coordinates for map ${containerId}:`, { lat, lon });
             container.innerHTML = `
-                <div style="text-align:center;padding:20px;color:#666;background:#f8f9fa;border-radius:5px;">
-                    <p>🗺️ Location not available</p>
-                    <small>Lat: ${lat || 'N/A'}, Lon: ${lon || 'N/A'}</small>
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 2rem; color: #666; text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📍</div>
+                    <p>Location not available</p>
+                    <small style="opacity: 0.7;">${lat?.toFixed(4) || 'N/A'}, ${lon?.toFixed(4) || 'N/A'}</small>
                 </div>
             `;
             return false;
         }
         
-        const map = L.map(containerId, {
-            center: [lat, lon],
-            zoom: 16,
-            zoomControl: true,
-            scrollWheelZoom: 'center'
-        });
+        const map = L.map(containerId).setView([lat, lon], 16);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
@@ -77,164 +87,18 @@ function initializeMap(containerId, lat, lon, popupText = "") {
             marker.bindPopup(popupText).openPopup();
         }
         
-        // FIXED: Proper bounds handling
-        const bounds = L.latLngBounds([[lat, lon]]).pad(0.1);
-        map.fitBounds(bounds);
-        
-        container.style.height = '280px';
-        container.style.width = '100%';
-        
-        setTimeout(() => {
-            map.invalidateSize();
-        }, 100);
-        
+        map.invalidateSize();
         container._mapInitialized = true;
-        debugLog(`🗺️ Map initialized: ${containerId} at [${lat}, ${lon}]`);
+        debugLog(`🗺️ Map initialized: ${containerId}`);
         return true;
         
     } catch (error) {
         console.error("❌ Map error:", error);
-        const container = document.getElementById(containerId);
-        if (container) {
-            container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">Map unavailable</div>';
-        }
         return false;
     }
 }
 
-// Dashboard order action handlers - FIXED
-async function handleOrderAction(orderId, action, lat = null, lon = null) {
-    const button = event?.target;
-    const card = button.closest('.order-card');
-    
-    if (!button || !card) {
-        console.error("❌ Button or card not found");
-        return;
-    }
-    
-    // Show processing state
-    const originalText = button.textContent;
-    const isDisabled = button.disabled;
-    
-    button.disabled = true;
-    button.classList.add('loading');
-    button.textContent = 'Processing...';
-    card.classList.add('processing');
-    
-    try {
-        debugLog(`🔄 Processing ${action} for order: ${orderId}`);
-        
-        let updateData = {};
-        
-        switch (action) {
-            case 'accept':
-                if (!confirm(`Accept this delivery order?\n\nOrder #${orderId.substring(orderId.length - 8)}`)) {
-                    throw new Error('Action cancelled by user');
-                }
-                
-                updateData = {
-                    status: 'accepted',
-                    acceptedTimestamp: new Date(),
-                    acceptedBy: currentDistributorEmail,
-                    acceptedLat: lat,
-                    acceptedLon: lon
-                };
-                break;
-                
-            case 'complete':
-                if (!confirm(`Mark this delivery as completed?\n\nOrder #${orderId.substring(orderId.length - 8)}`)) {
-                    throw new Error('Action cancelled by user');
-                }
-                
-                updateData = {
-                    status: 'completed',
-                    completedTimestamp: new Date(),
-                    completedBy: currentDistributorEmail,
-                    deliveryDistance: calculateDistance(lat, lon, lat, lon)
-                };
-                break;
-                
-            case 'cancel':
-                if (!confirm(`Cancel this order?\n\nThis action cannot be undone.\nOrder #${orderId.substring(orderId.length - 8)}`)) {
-                    throw new Error('Action cancelled by user');
-                }
-                
-                updateData = {
-                    status: 'cancelled',
-                    cancelledTimestamp: new Date(),
-                    cancelledBy: currentDistributorEmail,
-                    cancellationReason: 'Distributor declined'
-                };
-                break;
-                
-            default:
-                throw new Error(`Unknown action: ${action}`);
-        }
-        
-        // Update Firestore
-        await updateDoc(doc(db, "orders", orderId), updateData);
-        
-        // Show success
-        button.textContent = '✅ Done!';
-        button.style.background = '#28a745';
-        
-        // Update UI immediately
-        if (card) {
-            const statusSpan = card.querySelector('.order-status');
-            if (statusSpan) {
-                statusSpan.textContent = action.toUpperCase();
-                statusSpan.className = `order-status status-${action}`;
-            }
-            
-            // Update button text
-            if (action === 'accept') {
-                button.textContent = '🚚 Mark Delivered';
-                button.className = 'order-action btn-complete';
-                button.onclick = () => handleOrderAction(orderId, 'complete', lat, lon);
-            } else if (action === 'complete' || action === 'cancel') {
-                button.textContent = action === 'complete' ? '✅ Delivered' : '❌ Cancelled';
-                button.className = 'order-action btn-disabled';
-                button.disabled = true;
-                button.onclick = null;
-            }
-        }
-        
-        // Success message
-        const message = `✅ ${action === 'accept' ? 'Order accepted!' : 
-                        action === 'complete' ? 'Delivery completed!' : 
-                        'Order cancelled.'}`;
-        
-        setTimeout(() => {
-            alert(message);
-        }, 500);
-        
-        debugLog(`✅ ${action} successful for order: ${orderId}`);
-        
-    } catch (error) {
-        console.error(`❌ ${action} failed:`, error);
-        alert(`❌ Failed to ${action} order.\n\n${error.message}\nPlease try again.`);
-        
-        // Reset button
-        button.textContent = originalText;
-        button.disabled = isDisabled;
-        button.classList.remove('loading');
-        
-    } finally {
-        // Remove processing state
-        card.classList.remove('processing');
-        setTimeout(() => {
-            button.classList.remove('loading');
-        }, 300);
-    }
-}
-
-// Expose global functions for onclick handlers
-window.handleOrderAction = handleOrderAction;
-window.acceptOrder = (orderId, lat, lon) => handleOrderAction(orderId, 'accept', lat, lon);
-window.completeOrder = (orderId) => handleOrderAction(orderId, 'complete');
-window.cancelOrder = (orderId) => handleOrderAction(orderId, 'cancel');
-
-// Check distributor registration status
+// Check distributor status
 async function checkDistributorStatus(email) {
     if (!email) return { registered: false };
     
@@ -247,7 +111,7 @@ async function checkDistributorStatus(email) {
             const data = docSnap.data();
             return {
                 registered: true,
-                name: data.name,
+                name: data.name || 'Distributor',
                 mobile: data.mobile,
                 location: data.location,
                 status: data.status || 'active'
@@ -255,15 +119,15 @@ async function checkDistributorStatus(email) {
         }
         return { registered: false };
     } catch (error) {
-        console.error("❌ Error checking distributor status:", error);
-        return { registered: false, error: error.message };
+        console.error("❌ Status check error:", error);
+        return { registered: false };
     }
 }
 
 // Update distributor button
 async function updateDistributorButton() {
-    const distributorBtn = document.querySelector("#distributor");
-    const logoutBtn = document.querySelector("#logout");
+    const distributorBtn = document.getElementById("distributor");
+    const logoutBtn = document.getElementById("logout");
     
     if (!distributorBtn) return;
     
@@ -276,16 +140,26 @@ async function updateDistributorButton() {
         return;
     }
     
-    const status = await checkDistributorStatus(email);
-    
-    if (status.registered && status.name) {
-        distributorBtn.innerHTML = `👋 Welcome, ${status.name}`;
-        distributorBtn.className = "distributor-btn active";
-        if (logoutBtn) logoutBtn.style.display = "inline-block";
-    } else {
+    try {
+        const status = await checkDistributorStatus(email);
+        
+        if (status.registered) {
+            distributorBtn.innerHTML = `👋 Welcome, ${status.name}`;
+            distributorBtn.className = "distributor-btn active";
+            if (logoutBtn) {
+                logoutBtn.style.display = "inline-block";
+                logoutBtn.textContent = "🚪 Logout";
+            }
+        } else {
+            localStorage.removeItem("registeredDistributorEmail");
+            distributorBtn.textContent = "🚚 Register as Distributor";
+            distributorBtn.className = "distributor-btn";
+            if (logoutBtn) logoutBtn.style.display = "none";
+        }
+    } catch (error) {
+        console.error("❌ Button update error:", error);
         localStorage.removeItem("registeredDistributorEmail");
         distributorBtn.textContent = "🚚 Register as Distributor";
-        distributorBtn.className = "distributor-btn";
         if (logoutBtn) logoutBtn.style.display = "none";
     }
 }
@@ -293,64 +167,78 @@ async function updateDistributorButton() {
 // Handle distributor navigation
 async function handleDistributorClick(e) {
     e.preventDefault();
+    e.stopPropagation();
+    
     const email = localStorage.getItem("registeredDistributorEmail");
     
     if (!email) {
-        window.location.href = "distributorregistration.html";
+        window.location.href = "distributor-registration.html";
         return;
     }
     
-    const status = await checkDistributorStatus(email);
-    
-    if (status.registered) {
-        window.location.href = "distributordashboard.html";
-    } else {
+    try {
+        const status = await checkDistributorStatus(email);
+        
+        if (status.registered && status.status === 'active') {
+            window.location.href = "distributor-dashboard.html";
+        } else {
+            localStorage.removeItem("registeredDistributorEmail");
+            window.location.href = "distributor-registration.html";
+        }
+    } catch (error) {
         localStorage.removeItem("registeredDistributorEmail");
-        window.location.href = "distributorregistration.html";
+        window.location.href = "distributor-registration.html";
     }
 }
 
-// Calculate distance
+// Calculate distance (Haversine)
 function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
+    const R = 6371; // km
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
               Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
 }
 
-// Get location
+// Get location with UI
 async function getLocation(type = 'user') {
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
             reject(new Error("Geolocation not supported"));
             return;
         }
-
+        
+        // Loading overlay
         const overlay = document.createElement('div');
         overlay.id = 'location-overlay';
-        overlay.style.cssText = `
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.8); z-index: 9999; display: flex; 
-            align-items: center; justify-content: center; color: white;
-        `;
         overlay.innerHTML = `
-            <div style="text-align: center; padding: 2rem; max-width: 300px;">
-                <div style="width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.3); 
-                            border-top: 4px solid white; border-radius: 50%; 
-                            animation: spin 1s linear infinite; margin: 0 auto 1rem;"></div>
-                <h3>${type === 'distributor' ? 'Setting up delivery area...' : 'Finding your location...'}</h3>
-                <p>Please allow location access</p>
+            <div style="
+                position: fixed; top: 0; left: 0; width: 100%; height: 100vh; 
+                background: rgba(0,0,0,0.8); z-index: 9999; display: flex; 
+                align-items: center; justify-content: center; color: white;
+            ">
+                <div style="text-align: center; padding: 2rem; background: white; border-radius: 12px; color: #333;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📍</div>
+                    <h3>${type === 'distributor' ? 'Setting up your delivery area' : 'Finding your location'}</h3>
+                    <p style="margin-bottom: 1rem;">Please allow location access</p>
+                    <div style="
+                        width: 40px; height: 40px; border: 4px solid #e2e8f0; 
+                        border-top: 4px solid var(--primary-color); border-radius: 50%; 
+                        animation: spin 1s linear infinite; margin: 0 auto 1rem;
+                    "></div>
+                </div>
             </div>
         `;
         document.body.appendChild(overlay);
-
+        
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                if (overlay.parentNode) {
+                    overlay.parentNode.removeChild(overlay);
+                }
                 resolve({
                     latitude: position.coords.latitude,
                     longitude: position.coords.longitude,
@@ -359,15 +247,17 @@ async function getLocation(type = 'user') {
                 });
             },
             (error) => {
-                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                if (overlay.parentNode) {
+                    overlay.parentNode.removeChild(overlay);
+                }
                 reject(new Error(`Location error: ${error.message}`));
             },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
         );
     });
 }
 
-// Fetch distributors
+// Fetch active distributors
 async function fetchDistributors() {
     try {
         const snapshot = await getDocs(collection(db, "distributors"));
@@ -375,7 +265,7 @@ async function fetchDistributors() {
         
         snapshot.forEach((doc) => {
             const data = doc.data();
-            if (data.location && data.status === "active" && data.mobile) {
+            if (data.status === "active" && data.location && data.mobile && data.email) {
                 const lat = data.location.lati || data.location.latitude;
                 const lng = data.location.long || data.location.longitude;
                 if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
@@ -394,7 +284,7 @@ async function fetchDistributors() {
         
         return distributors;
     } catch (error) {
-        console.error("❌ Error fetching distributors:", error);
+        console.error("❌ Fetch distributors error:", error);
         return [];
     }
 }
@@ -404,7 +294,7 @@ async function findNearestDistributor(userLat, userLon) {
     try {
         const distributors = await fetchDistributors();
         if (distributors.length === 0) {
-            throw new Error("No active distributors available");
+            throw new Error("No distributors available");
         }
         
         let nearest = null;
@@ -412,19 +302,18 @@ async function findNearestDistributor(userLat, userLon) {
         
         for (const dist of distributors) {
             const distance = calculateDistance(userLat, userLon, dist.lat, dist.lng);
-            if (distance <= (dist.radius || 15) && distance < minDistance) {
+            if (distance <= dist.radius && distance < minDistance) {
                 minDistance = distance;
                 nearest = dist;
             }
         }
         
         if (!nearest) {
-            throw new Error("No distributors available in your area");
+            throw new Error("No distributors in your area");
         }
         
         return nearest;
     } catch (error) {
-        console.error("❌ Error finding distributor:", error);
         throw error;
     }
 }
@@ -451,68 +340,79 @@ async function placeOrder(userLocation, distributor) {
         };
         
         await setDoc(doc(db, "orders", orderId), orderData);
-        return { success: true, orderId, ...orderData };
+        return orderData;
     } catch (error) {
-        console.error("❌ Error placing order:", error);
         throw error;
     }
 }
 
-// FIXED: Initialize dashboard
+// Update order status
+async function updateOrderStatus(orderId, status, lat = null, lon = null) {
+    try {
+        const updateData = {
+            status,
+            updatedTimestamp: new Date()
+        };
+        
+        switch (status) {
+            case 'accepted':
+                updateData.acceptedTimestamp = new Date();
+                updateData.acceptedBy = localStorage.getItem("registeredDistributorEmail");
+                if (lat && lon) {
+                    updateData.acceptedLat = lat;
+                    updateData.acceptedLon = lon;
+                }
+                break;
+            case 'completed':
+                updateData.completedTimestamp = new Date();
+                updateData.completedBy = localStorage.getItem("registeredDistributorEmail");
+                break;
+            case 'cancelled':
+                updateData.cancelledTimestamp = new Date();
+                updateData.cancelledBy = localStorage.getItem("registeredDistributorEmail");
+                break;
+        }
+        
+        await updateDoc(doc(db, "orders", orderId), updateData);
+        return true;
+    } catch (error) {
+        throw error;
+    }
+}
+
+// Dashboard initialization
 function initializeDashboard() {
     const ordersList = document.getElementById("orders-list");
     const statsBar = document.getElementById("stats-bar");
-    const messageDiv = document.getElementById("dashboard-message");
+    const ordersCount = document.getElementById("orders-total");
     
-    if (!ordersList) {
-        console.error("❌ Orders container not found");
-        return null;
-    }
+    if (!ordersList) return;
     
-    currentDistributorEmail = localStorage.getItem("registeredDistributorEmail");
-    if (!currentDistributorEmail) {
+    const email = localStorage.getItem("registeredDistributorEmail");
+    if (!email) {
         ordersList.innerHTML = `
             <div class="no-orders">
-                <h3>👋 Welcome to Dashboard</h3>
-                <p>Please <a href="index.html#distributor" style="color: #667eea;">register as a distributor</a> to view orders.</p>
+                <div class="icon">👋</div>
+                <h3>Welcome to Dashboard</h3>
+                <p>Please <a href="index.html#distributor">register as a distributor</a> to view orders.</p>
             </div>
         `;
-        return null;
+        return;
     }
     
-    debugLog("Initializing dashboard for:", currentDistributorEmail);
-    
-    // Show loading
+    // Loading state
     ordersList.innerHTML = `
         <div class="loading-orders">
-            <div class="loading-spinner"></div>
-            <h3>🔄 Loading orders...</h3>
+            <div class="spinner"></div>
+            <h3>Loading orders...</h3>
             <p>Connecting to delivery network</p>
         </div>
     `;
     
-    if (messageDiv) messageDiv.style.display = "none";
-    
-    // Set up listener
-    const q = query(collection(db, "orders"), where("distributorEmail", "==", currentDistributorEmail));
+    // Real-time listener
+    const q = query(collection(db, "orders"), where("distributorEmail", "==", email));
     
     dashboardUnsubscribe = onSnapshot(q, (snapshot) => {
-        debugLog(`📦 Received ${snapshot.size} orders`);
-        
-        if (snapshot.empty) {
-            ordersList.innerHTML = `
-                <div class="no-orders">
-                    <div style="font-size: 4rem; margin-bottom: 1rem; opacity: 0.3;">📦</div>
-                    <h3>No Orders Yet</h3>
-                    <p style="font-size: 1.1rem;">You don't have any pending orders right now.</p>
-                    <p style="opacity: 0.8; font-size: 0.95rem;">Orders will appear here automatically when customers place them.</p>
-                </div>
-            `;
-            if (statsBar) statsBar.style.display = "none";
-            return;
-        }
-        
-        // Process orders
         const orders = [];
         let total = 0, pending = 0, completed = 0, revenue = 0;
         
@@ -521,9 +421,9 @@ function initializeDashboard() {
             total++;
             orders.push({ id: doc.id, ...order });
             
-            const orderStatus = order.status || 'pending';
-            if (orderStatus === 'pending') pending++;
-            if (orderStatus === 'completed') {
+            const status = order.status || 'pending';
+            if (status === 'pending') pending++;
+            if (status === 'completed') {
                 completed++;
                 revenue += order.price || 30;
             }
@@ -531,12 +431,14 @@ function initializeDashboard() {
         
         // Update stats
         if (statsBar) {
-            statsBar.style.display = "grid";
+            statsBar.style.display = total > 0 ? 'grid' : 'none';
             document.getElementById('total-orders').textContent = total;
             document.getElementById('pending-orders').textContent = pending;
             document.getElementById('completed-orders').textContent = completed;
             document.getElementById('revenue').textContent = `₹${revenue}`;
         }
+        
+        if (ordersCount) ordersCount.textContent = total;
         
         // Render orders
         renderOrders(orders);
@@ -544,30 +446,33 @@ function initializeDashboard() {
     }, (error) => {
         console.error("❌ Dashboard error:", error);
         ordersList.innerHTML = `
-            <div class="no-orders" style="color: #dc3545;">
-                <h3>❌ Connection Error</h3>
-                <p>Unable to load orders.</p>
-                <p style="font-size: 0.9rem; opacity: 0.8;">${error.message}</p>
-                <button onclick="location.reload()" style="background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 1rem;">
-                    🔄 Retry
-                </button>
+            <div class="no-orders" style="color: #f56565;">
+                <div class="icon">⚠️</div>
+                <h3>Connection Error</h3>
+                <p>Unable to load orders</p>
+                <button onclick="location.reload()" class="btn-primary" style="margin-top: 1rem;">🔄 Retry</button>
             </div>
         `;
-        if (messageDiv) {
-            messageDiv.textContent = `Error: ${error.message}`;
-            messageDiv.style.display = "block";
-        }
     });
-    
-    return dashboardUnsubscribe;
 }
 
-// IMPROVED: Render orders
+// Render orders
 function renderOrders(orders) {
     const ordersList = document.getElementById("orders-list");
-    if (!ordersList || orders.length === 0) return;
     
-    debugLog(`Rendering ${orders.length} orders`);
+    if (!ordersList) return;
+    
+    if (orders.length === 0) {
+        ordersList.innerHTML = `
+            <div class="no-orders">
+                <div class="icon">📦</div>
+                <h3>No Orders Yet</h3>
+                <p>You don't have any pending orders right now.</p>
+                <p style="opacity: 0.8;">Orders will appear here when customers place them.</p>
+            </div>
+        `;
+        return;
+    }
     
     let html = '';
     
@@ -585,32 +490,55 @@ function renderOrders(orders) {
         const statusText = (status || 'PENDING').toUpperCase();
         
         const popupContent = `
-            <b>Delivery Location</b><br>
-            📦 ${product || 'Water Bottle'}<br>
-            💰 ₹${price || 30}<br>
-            👤 ${customerName || 'Customer'}<br>
-            📍 ${lat.toFixed(4)}, ${lon.toFixed(4)}
+            <div style="font-size: 0.9rem; min-width: 180px;">
+                <strong>Delivery Location</strong><br>
+                📦 ${product || 'Water Bottle'}<br>
+                💰 ₹${price || 30}<br>
+                👤 ${customerName || 'Customer'}<br>
+                📍 ${lat?.toFixed(4) || 'N/A'}, ${lon?.toFixed(4) || 'N/A'}
+            </div>
         `;
         
         html += `
             <div class="order-card" data-order-id="${id}">
                 <div class="order-header">
-                    <div class="order-id">Order #${id.substring(id.length - 8)}</div>
+                    <div class="order-id">#${id.substring(id.length - 8)}</div>
                     <span class="order-status ${statusClass}">${statusText}</span>
                 </div>
                 
-                <div class="order-details">
-                    <div class="detail-group">
-                        <p><strong>📦 Product:</strong> ${product || 'Water Bottle'}</p>
-                        <p><strong>💰 Price:</strong> ₹${price || 30}</p>
-                        <p><strong>👤 Customer:</strong> ${customerName || 'Customer'}</p>
-                        <p><strong>⏰ Time:</strong> ${time}</p>
+                <div class="order-content">
+                    <div class="order-details-grid">
+                        <div class="detail-row">
+                            <span class="detail-label">📦 Product</span>
+                            <span class="detail-value">${product || 'Water Bottle'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">💰 Amount</span>
+                            <span class="detail-value important">₹${price || 30}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">👤 Customer</span>
+                            <span class="detail-value">${customerName || 'Customer'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">⏰ Time</span>
+                            <span class="detail-value">${time}</span>
+                        </div>
                     </div>
-                    <div class="detail-group">
-                        <p><strong>📍 Location:</strong></p>
-                        <p style="font-size: 0.9em; color: #666;">
-                            ${isValidLocation ? `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}` : 'Location unavailable'}
-                        </p>
+                    
+                    <div class="order-details-grid">
+                        <div class="detail-row">
+                            <span class="detail-label">📍 Latitude</span>
+                            <span class="detail-value">${lat?.toFixed(6) || 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">📍 Longitude</span>
+                            <span class="detail-value">${lon?.toFixed(6) || 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">📏 Accuracy</span>
+                            <span class="detail-value">${customerLocation?.accuracy?.toFixed(0) || 'N/A'}m</span>
+                        </div>
                     </div>
                 </div>
                 
@@ -619,42 +547,38 @@ function renderOrders(orders) {
                 <div class="action-buttons">
                     ${status === 'pending' ? `
                         <button class="order-action btn-accept" data-action="accept" data-order-id="${id}" data-lat="${lat}" data-lon="${lon}">
-                            ✅ Accept Order
+                            <span>✅ Accept Order</span>
                         </button>
                         <button class="order-action btn-cancel" data-action="cancel" data-order-id="${id}">
-                            ❌ Decline
+                            <span>❌ Decline</span>
                         </button>
                     ` : status === 'accepted' ? `
                         <button class="order-action btn-complete" data-action="complete" data-order-id="${id}">
-                            🚚 Mark Delivered
-                        </button>
-                        <button class="order-action btn-cancel" data-action="cancel" data-order-id="${id}">
-                            ❌ Cancel
+                            <span>🚚 Mark Delivered</span>
                         </button>
                     ` : status === 'completed' ? `
                         <button class="order-action btn-disabled" disabled>
-                            ✅ Delivered
+                            <span>✅ Delivered</span>
                         </button>
                     ` : status === 'cancelled' ? `
                         <button class="order-action btn-disabled" disabled>
-                            ❌ Cancelled
+                            <span>❌ Cancelled</span>
                         </button>
                     ` : ''}
                 </div>
             </div>
         `;
         
-        // Initialize map if valid location
         if (isValidLocation) {
             setTimeout(() => {
                 initializeMap(`map-${id}`, lat, lon, popupContent);
-            }, 200);
+            }, 300);
         }
     });
     
     ordersList.innerHTML = html;
     
-    // FIXED: Add event listeners to buttons
+    // Add event listeners
     const actionButtons = ordersList.querySelectorAll('.order-action[data-action]');
     actionButtons.forEach(button => {
         button.addEventListener('click', function(e) {
@@ -663,29 +587,95 @@ function renderOrders(orders) {
             const orderId = this.dataset.orderId;
             const lat = parseFloat(this.dataset.lat) || 0;
             const lon = parseFloat(this.dataset.lon) || 0;
-            
             handleOrderAction(orderId, action, lat, lon);
         });
     });
+}
+
+// Order action handler
+async function handleOrderAction(orderId, action, lat = 0, lon = 0) {
+    const button = event?.target;
+    const card = button?.closest('.order-card');
     
-    debugLog(`✅ Rendered ${orders.length} orders with ${actionButtons.length} action buttons`);
+    if (!button || !card) {
+        alert('Error: Unable to process action');
+        return;
+    }
+    
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.classList.add('loading');
+    card.classList.add('processing');
+    
+    try {
+        let confirmMessage = '';
+        switch (action) {
+            case 'accept':
+                confirmMessage = `Accept delivery order #${orderId.slice(-8)}?`;
+                break;
+            case 'complete':
+                confirmMessage = `Mark delivery as completed for order #${orderId.slice(-8)}?`;
+                break;
+            case 'cancel':
+                confirmMessage = `Cancel order #${orderId.slice(-8)}? This cannot be undone.`;
+                break;
+        }
+        
+        if (!confirm(confirmMessage)) {
+            throw new Error('Action cancelled');
+        }
+        
+        await updateOrderStatus(orderId, action, lat, lon);
+        
+        // Update UI
+        const statusSpan = card.querySelector('.order-status');
+        if (statusSpan) {
+            statusSpan.textContent = action.toUpperCase();
+            statusSpan.className = `order-status status-${action}`;
+        }
+        
+        button.innerHTML = `<span>${action === 'accept' ? 'Accepted!' : action === 'complete' ? 'Delivered!' : 'Cancelled!'}</span>`;
+        button.className = 'order-action btn-disabled';
+        button.disabled = true;
+        
+        setTimeout(() => {
+            if (action === 'accept') {
+                // Change to complete button
+                button.innerHTML = '<span>🚚 Mark Delivered</span>';
+                button.className = 'order-action btn-complete';
+                button.disabled = false;
+                button.onclick = () => handleOrderAction(orderId, 'complete');
+            }
+        }, 1500);
+        
+        debugLog(`✅ ${action} successful: ${orderId}`);
+        
+    } catch (error) {
+        console.error(`❌ ${action} failed:`, error);
+        alert(`Failed to ${action} order: ${error.message}`);
+        button.innerHTML = originalText;
+        button.disabled = false;
+        button.classList.remove('loading');
+    } finally {
+        card.classList.remove('processing');
+        setTimeout(() => {
+            button.classList.remove('loading');
+        }, 300);
+    }
 }
 
 // Main initialization
 document.addEventListener("DOMContentLoaded", async () => {
-    debugLog("🚀 Water is Life - Initializing...");
+    debugLog("🚀 Water is Life - Starting up...");
     
     // Update distributor button
-    if (document.querySelector("#distributor")) {
+    if (document.getElementById("distributor")) {
         await updateDistributorButton();
-        const distributorBtn = document.querySelector("#distributor");
-        if (distributorBtn) {
-            distributorBtn.addEventListener("click", handleDistributorClick);
-        }
+        document.getElementById("distributor").addEventListener("click", handleDistributorClick);
     }
     
-    // Logout
-    const logoutBtn = document.querySelector("#logout");
+    // Logout handler
+    const logoutBtn = document.getElementById("logout");
     if (logoutBtn) {
         logoutBtn.addEventListener("click", (e) => {
             e.preventDefault();
@@ -697,11 +687,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     // Buy buttons
     const buyButtons = document.querySelectorAll(".add-to-cart");
-    buyButtons.forEach((button) => {
+    debugLog(`Found ${buyButtons.length} buy buttons`);
+    
+    buyButtons.forEach((button, index) => {
         button.addEventListener("click", async () => {
             try {
+                const originalText = button.textContent;
                 button.disabled = true;
-                button.textContent = "Processing...";
+                button.textContent = "🔄 Processing...";
                 
                 const userLocation = await getLocation('user');
                 const distributor = await findNearestDistributor(userLocation.latitude, userLocation.longitude);
@@ -712,16 +705,28 @@ document.addEventListener("DOMContentLoaded", async () => {
                     distributor.lat, distributor.lng
                 );
                 
-                alert(`✅ Order placed!\n\n📦 ${orderResult.product}\n💰 ₹${orderResult.price}\n🚚 ${distributor.name}\n📍 ${distance.toFixed(1)} km\n\nOrder #${orderResult.orderId.slice(-8)}`);
+                const message = `✅ Order placed successfully!\n\n` +
+                    `📦 ${orderResult.product}\n` +
+                    `💰 ₹${orderResult.price}\n` +
+                    `🚚 ${distributor.name}\n` +
+                    `📱 ${distributor.mobile}\n` +
+                    `📍 ${distance.toFixed(1)} km away\n\n` +
+                    `Order ID: ${orderResult.orderId.slice(-8)}`;
                 
-                button.textContent = "✅ Ordered!";
+                alert(message);
+                
+                button.textContent = "✅ Order Placed!";
+                button.style.background = "#28a745";
+                
                 setTimeout(() => {
-                    button.textContent = "🛒 Buy Now";
+                    button.textContent = originalText;
+                    button.style.background = "";
                     button.disabled = false;
-                }, 2000);
+                }, 3000);
                 
             } catch (error) {
-                alert(`❌ ${error.message}`);
+                console.error("❌ Order error:", error);
+                alert(`❌ ${error.message}\n\nPlease try again or contact support.`);
                 button.textContent = "🛒 Buy Now";
                 button.disabled = false;
             }
@@ -738,7 +743,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             const button = contactForm.querySelector("button");
             
             if (!name || !email) {
-                alert("Please fill all fields");
+                alert("Please fill in all fields.");
+                return;
+            }
+            
+            if (!email.includes('@') || !email.includes('.')) {
+                alert("Please enter a valid email address.");
                 return;
             }
             
@@ -748,14 +758,19 @@ document.addEventListener("DOMContentLoaded", async () => {
                 
                 const docId = email.replace(/[^a-zA-Z0-9._%+-@]/g, "_");
                 await setDoc(doc(db, "contacts", docId), {
-                    name, email, timestamp: new Date()
+                    name,
+                    email,
+                    message: "Contact form submission",
+                    timestamp: new Date(),
+                    source: "website"
                 });
                 
-                alert(`✅ Thank you, ${name}! We'll contact you soon.`);
+                alert(`✅ Thank you, ${name}!\n\nWe'll get back to you within 24 hours.`);
                 contactForm.reset();
                 
             } catch (error) {
-                alert("❌ Failed to send message");
+                console.error("❌ Contact error:", error);
+                alert("❌ Failed to send message. Please try again.");
             } finally {
                 button.disabled = false;
                 button.textContent = "📧 Send Message";
@@ -763,7 +778,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
     
-    // Distributor registration form
+    // Distributor registration
     const distributorForm = document.getElementById("distributor-form");
     if (distributorForm) {
         distributorForm.addEventListener("submit", async (e) => {
@@ -773,67 +788,100 @@ document.addEventListener("DOMContentLoaded", async () => {
             const email = document.getElementById("distributor-email").value.trim();
             const mobile = document.getElementById("distributor-mobile").value.trim();
             const submitBtn = document.getElementById("registration-submit");
+            const buttonText = document.getElementById("button-text");
+            const spinner = document.getElementById("loading-spinner");
+            const errorMsg = document.getElementById("error-message");
+            const successMsg = document.getElementById("success-message");
             
+            // Reset messages
+            errorMsg.style.display = "none";
+            successMsg.style.display = "none";
+            
+            // Validation
             if (!name || !email || !mobile) {
-                alert("Please fill all fields");
+                errorMsg.textContent = "Please fill in all fields.";
+                errorMsg.style.display = "block";
+                return;
+            }
+            
+            if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
+                errorMsg.textContent = "Please enter a valid email address.";
+                errorMsg.style.display = "block";
                 return;
             }
             
             if (!/^[0-9]{10}$/.test(mobile)) {
-                alert("Please enter valid 10-digit mobile number");
+                errorMsg.textContent = "Please enter a valid 10-digit mobile number.";
+                errorMsg.style.display = "block";
                 return;
             }
             
             try {
+                // Show loading
+                buttonText.style.display = "none";
+                spinner.style.display = "inline-block";
                 submitBtn.disabled = true;
-                submitBtn.textContent = "Registering...";
                 
-                // Check if already registered
+                // Check existing
                 const existing = await checkDistributorStatus(email);
                 if (existing.registered) {
-                    alert("This email is already registered");
+                    errorMsg.textContent = "This email is already registered. Please use a different email.";
+                    errorMsg.style.display = "block";
                     return;
                 }
                 
+                // Get location
                 const location = await getLocation('distributor');
-                const docId = email.replace(/[^a-zA-Z0-9._%+-@]/g, "_");
                 
+                // Save distributor
+                const docId = email.replace(/[^a-zA-Z0-9._%+-@]/g, "_");
                 await setDoc(doc(db, "distributors", docId), {
-                    name, email, mobile,
+                    name,
+                    email,
+                    mobile,
                     location: {
                         lati: location.latitude,
                         long: location.longitude,
+                        accuracy: location.accuracy,
                         timestamp: location.timestamp
                     },
                     status: "active",
-                    registrationTimestamp: new Date()
+                    deliveryRadius: 15,
+                    registrationTimestamp: new Date(),
+                    totalOrders: 0,
+                    completedOrders: 0
                 });
                 
+                // Save to localStorage
                 localStorage.setItem("registeredDistributorEmail", email);
-                alert(`✅ Welcome, ${name}!\nRegistration complete!`);
-                window.location.href = "distributordashboard.html";
+                
+                // Success
+                successMsg.style.display = "block";
+                debugLog("✅ Distributor registered:", email);
+                
+                setTimeout(() => {
+                    window.location.href = "distributor-dashboard.html";
+                }, 2000);
                 
             } catch (error) {
-                alert(`❌ ${error.message}`);
+                errorMsg.textContent = error.message;
+                errorMsg.style.display = "block";
+                console.error("❌ Registration error:", error);
             } finally {
+                buttonText.style.display = "inline";
+                spinner.style.display = "none";
                 submitBtn.disabled = false;
-                submitBtn.textContent = "🚀 Register Now";
             }
         });
     }
     
     // WhatsApp CTA
-    const ctaButton = document.querySelector("#cta-button");
+    const ctaButton = document.getElementById("cta-button");
     if (ctaButton) {
         ctaButton.addEventListener("click", () => {
-            const message = encodeURIComponent("Hello! I'd like to order 20L purified water.");
+            const message = encodeURIComponent("Hello! I'd like to order 20L purified water for immediate delivery. 💧📦");
             window.open(`https://wa.me/+916299694236?text=${message}`, '_blank');
         });
-    }
-    
-    // FIXED: Initialize dashboard
-    if (document.getElementById("orders-list")) {
-        initializeDashboard();
     }
     
     // Mobile menu
@@ -845,10 +893,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
     
-    debugLog("🎉 App initialization complete!");
+    // Initialize dashboard
+    if (document.getElementById("orders-list")) {
+        initializeDashboard();
+    }
+    
+    debugLog("🎉 App initialized successfully!");
 });
 
-// Cleanup on page unload
+// Cleanup
 window.addEventListener('beforeunload', () => {
     if (dashboardUnsubscribe) {
         dashboardUnsubscribe();

@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributor Dashboard - Water is Life</title>
+    <link rel="stylesheet" href="water.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        :root {
+            --primary-color: #667eea;
+            --primary-dark: #5a67d8;
+            --success-color: #48bb78;
+            --danger-color: #f56565;
+            --warning-color: #ed8936;
+            --text-dark: #2d3748;
+            --text-light: #718096;
+            --bg-light: #f7fafc;
+            --border-color: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--text-dark);
+        }
+        
+        .dashboard-header {
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+            backdrop-filter: blur(10px);
+        }
+        
+        .dashboard-header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+        
+        .dashboard-header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+            margin-bottom: 0;
+        }
+        
+        .back-button {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            padding: 0.75rem 1.25rem;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+        }
+        
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+        
+        .dashboard-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+        
+        .stats-bar {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+        }
+        
+        .stat-card {
+            text-align: center;
+            padding: 1.5rem 1rem;
+            background: white;
+            border-radius: 12px;
+            transition: transform 0.2s ease;
+            border: 1px solid var(--border-color);
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+        
+        .stat-card .icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            opacity: 0.8;
+        }
+        
+        .stat-card h3 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            color: var(--primary-color);
+        }
+        
+        .stat-card p {
+            color: var(--text-light);
+            font-size: 0.95rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .orders-section {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+        }
+        
+        .orders-section h2 {
+            color: var(--text-dark);
+            margin-bottom: 2rem;
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+        
+        .orders-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .orders-count {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        .no-orders {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-light);
+        }
+        
+        .no-orders .icon {
+            font-size: 5rem;
+            margin-bottom: 1.5rem;
+            opacity: 0.3;
+        }
+        
+        .no-orders h3 {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            color: var(--text-dark);
+            font-weight: 600;
+        }
+        
+        .no-orders p {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            opacity: 0.8;
+        }
+        
+        .order-card {
+            background: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .order-card:hover {
+            border-color: var(--primary-color);
+            box-shadow: var(--shadow);
+            transform: translateY(-2px);
+        }
+        
+        .order-card.processing::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(102, 126, 234, 0.1);
+            z-index: 10;
+        }
+        
+        .order-card.processing .action-buttons {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .order-id {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            background: var(--bg-light);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .order-status {
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status-accepted {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-cancelled {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .order-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .order-details-grid {
+            display: grid;
+            gap: 0.75rem;
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        
+        .detail-label {
+            font-weight: 600;
+            color: var(--text-dark);
+            min-width: 100px;
+        }
+        
+        .detail-value {
+            color: var(--text-light);
+            text-align: right;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .detail-value.important {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        
+        .map-container {
+            grid-column: 1 / -1;
+            height: 300px;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            background: var(--bg-light);
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+        
+        .map-container.loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-light);
+        }
+        
+        .map-loading {
+            text-align: center;
+            color: var(--text-light);
+        }
+        
+        .map-loading .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            padding-top: 1rem;
+            border-top: 2px solid var(--border-color);
+        }
+        
+        .order-action {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 160px;
+            position: relative;
+            font-family: inherit;
+        }
+        
+        .order-action:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        
+        .order-action.loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 18px;
+            height: 18px;
+            margin: -9px 0 0 -9px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .order-action.loading span {
+            opacity: 0;
+        }
+        
+        .btn-accept {
+            background: var(--success-color);
+            color: white;
+            border: 2px solid var(--success-color);
+        }
+        
+        .btn-accept:hover:not(:disabled) {
+            background: #38a169;
+            border-color: #38a169;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+        }
+        
+        .btn-complete {
+            background: var(--primary-color);
+            color: white;
+            border: 2px solid var(--primary-color);
+        }
+        
+        .btn-complete:hover:not(:disabled) {
+            background: var(--primary-dark);
+            border-color: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-cancel {
+            background: var(--danger-color);
+            color: white;
+            border: 2px solid var(--danger-color);
+        }
+        
+        .btn-cancel:hover:not(:disabled) {
+            background: #e53e3e;
+            border-color: #e53e3e;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(245, 101, 101, 0.3);
+        }
+        
+        .btn-disabled {
+            background: #a0aec0;
+            color: white;
+            border: 2px solid #a0aec0;
+            cursor: not-allowed;
+        }
+        
+        .loading-orders {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-light);
+        }
+        
+        .loading-orders .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1.5rem;
+        }
+        
+        .loading-orders h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-dark);
+        }
+        
+        .loading-orders p {
+            opacity: 0.8;
+            font-size: 1rem;
+        }
+        
+        .error-message {
+            background: #fed7d7;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+        }
+        
+        .success-message {
+            background: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 1rem;
+            }
+            
+            .order-content {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .order-action {
+                width: 100%;
+                max-width: 300px;
+            }
+            
+            .map-container {
+                height: 250px;
+            }
+            
+            .stats-bar {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .dashboard-header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .order-card {
+                padding: 1rem;
+            }
+            
+            .order-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+            
+            .map-container {
+                height: 220px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="dashboard-header">
+        <a href="index.html" class="back-button">← Home</a>
+        <h1>🚚 Distributor Dashboard</h1>
+        <p>Manage your water delivery orders in real-time</p>
+    </header>
+    
+    <div class="dashboard-container">
+        <!-- Stats Bar -->
+        <div class="stats-bar" id="stats-bar" style="display: none;">
+            <div class="stat-card">
+                <div class="icon">📦</div>
+                <h3 id="total-orders">0</h3>
+                <p>Total Orders</p>
+            </div>
+            <div class="stat-card">
+                <div class="icon">⏳</div>
+                <h3 id="pending-orders">0</h3>
+                <p>Pending</p>
+            </div>
+            <div class="stat-card">
+                <div class="icon">✓</div>
+                <h3 id="completed-orders">0</h3>
+                <p>Completed</p>
+            </div>
+            <div class="stat-card">
+                <div class="icon">💰</div>
+                <h3 id="revenue">₹0</h3>
+                <p>Revenue</p>
+            </div>
+        </div>
+        
+        <!-- Orders Section -->
+        <div class="orders-section">
+            <div class="orders-header">
+                <div class="orders-count" id="orders-count">
+                    <span id="orders-total">0</span> orders found
+                </div>
+                <div class="refresh-btn">
+                    <button onclick="location.reload()" style="
+                        background: var(--primary-color); color: white; border: none;
+                        padding: 8px 16px; border-radius: 6px; cursor: pointer;
+                        font-size: 0.9rem;
+                    ">🔄 Refresh</button>
+                </div>
+            </div>
+            
+            <h2>📦 Active Orders</h2>
+            <div id="orders-list" class="loading-orders">
+                <div class="spinner"></div>
+                <h3>🔄 Loading your orders...</h3>
+                <p>Connecting to delivery network</p>
+            </div>
+            
+            <div id="error-message" class="error-message" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module" src="water2.js"></script>
+</body>
+</html>
