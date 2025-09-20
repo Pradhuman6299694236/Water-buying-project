@@ -303,7 +303,7 @@ async function handleDistributorClick(e) {
     const status = await checkDistributorStatus(email);
     
     if (status.registered) {
-        window.location.href = "distributorDashboard.html";
+        window.location.href = "distributordashboard.html";
     } else {
         localStorage.removeItem("registeredDistributorEmail");
         window.location.href = "distributorregistration.html";
@@ -811,7 +811,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 
                 localStorage.setItem("registeredDistributorEmail", email);
                 alert(`✅ Welcome, ${name}!\nRegistration complete!`);
-                window.location.href = "distributorDashboard.html";
+                window.location.href = "distributordashboard.html";
                 
             } catch (error) {
                 alert(`❌ ${error.message}`);
