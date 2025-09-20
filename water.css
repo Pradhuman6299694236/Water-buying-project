@@ -403,3 +403,53 @@ footer {
   padding: 1rem;
   margin-top: 2rem;
 }
+/* Distributor Button Styles */
+.distributor-btn {
+    background: #333;
+    color: white;
+    border: 2px solid #f0a500;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+    margin-left: 10px;
+}
+
+.distributor-btn:hover {
+    background: #f0a500;
+    color: #333;
+    transform: translateY(-2px);
+}
+
+.distributor-btn.active {
+    background: #28a745;
+    border-color: #28a745;
+}
+
+.logout-btn {
+    background: #dc3545;
+    color: white;
+    border: 2px solid #dc3545;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+    margin-left: 5px;
+}
+
+.logout-btn:hover {
+    background: #c82333;
+    border-color: #c82333;
+    transform: translateY(-2px);
+}
+
+/* Loading Overlay */
+#location-overlay {
+    font-family: Arial, sans-serif;
+}

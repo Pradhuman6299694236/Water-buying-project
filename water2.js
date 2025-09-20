@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs, onSnapshot, query, where, updateDoc, orderBy } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, onSnapshot, query, where, updateDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDsdEsybJ_ylCu4m2Y3l-QY5pJxwXZPCE4",
@@ -14,161 +14,305 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Debug function
+// Global dashboard state
+let dashboardUnsubscribe = null;
+let currentDistributorEmail = null;
+
+// Debug logging
 function debugLog(message, data = null) {
-    console.log(`🔍 [DEBUG] ${message}`, data || '');
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(`🔍 [${timestamp}] ${message}`, data || '');
 }
 
-// Simple error handler
-function handleError(error, context = "Unknown") {
-    console.error(`❌ [${context}] Error:`, error);
-    return error.message || 'Unknown error';
+// Error handler
+function handleError(error, context = "General") {
+    console.error(`❌ [${context}] ${error.message}`, error);
+    return error.message;
 }
 
-// Initialize Leaflet maps
+// FIXED: Initialize maps
 function initializeMap(containerId, lat, lon, popupText = "") {
     try {
         if (!window.L) {
-            console.error("❌ Leaflet not loaded!");
+            console.error("❌ Leaflet library not loaded");
             return false;
         }
         
         const container = document.getElementById(containerId);
         if (!container) {
-            console.error(`❌ Map container ${containerId} not found!`);
+            console.error(`❌ Container ${containerId} not found`);
             return false;
         }
         
-        // Check if map already exists
-        if (container._leaflet_id) {
+        if (container._mapInitialized) {
             console.log(`🗺️ Map ${containerId} already initialized`);
             return true;
         }
         
-        const map = L.map(containerId).setView([lat, lon], 15);
+        if (!lat || !lon || isNaN(lat) || isNaN(lon)) {
+            console.warn(`⚠️ Invalid coordinates for map ${containerId}:`, { lat, lon });
+            container.innerHTML = `
+                <div style="text-align:center;padding:20px;color:#666;background:#f8f9fa;border-radius:5px;">
+                    <p>🗺️ Location not available</p>
+                    <small>Lat: ${lat || 'N/A'}, Lon: ${lon || 'N/A'}</small>
+                </div>
+            `;
+            return false;
+        }
+        
+        const map = L.map(containerId, {
+            center: [lat, lon],
+            zoom: 16,
+            zoomControl: true,
+            scrollWheelZoom: 'center'
+        });
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
         }).addTo(map);
         
-        L.marker([lat, lon]).addTo(map)
-            .bindPopup(popupText)
-            .openPopup();
+        const marker = L.marker([lat, lon]).addTo(map);
+        if (popupText) {
+            marker.bindPopup(popupText).openPopup();
+        }
         
-        map.invalidateSize();
+        // FIXED: Proper bounds handling
+        const bounds = L.latLngBounds([[lat, lon]]).pad(0.1);
+        map.fitBounds(bounds);
+        
+        container.style.height = '280px';
+        container.style.width = '100%';
+        
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 100);
+        
         container._mapInitialized = true;
-        console.log(`🗺️ Map initialized for ${containerId} at [${lat}, ${lon}]`);
+        debugLog(`🗺️ Map initialized: ${containerId} at [${lat}, ${lon}]`);
         return true;
         
     } catch (error) {
-        console.error("❌ Map initialization error:", error);
+        console.error("❌ Map error:", error);
         const container = document.getElementById(containerId);
         if (container) {
-            container.innerHTML = '<p style="text-align: center; padding: 20px; color: #666;">Map failed to load</p>';
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">Map unavailable</div>';
         }
         return false;
     }
 }
 
-// Fetch distributor name by email
-async function fetchDistributorName(email) {
+// Dashboard order action handlers - FIXED
+async function handleOrderAction(orderId, action, lat = null, lon = null) {
+    const button = event?.target;
+    const card = button.closest('.order-card');
+    
+    if (!button || !card) {
+        console.error("❌ Button or card not found");
+        return;
+    }
+    
+    // Show processing state
+    const originalText = button.textContent;
+    const isDisabled = button.disabled;
+    
+    button.disabled = true;
+    button.classList.add('loading');
+    button.textContent = 'Processing...';
+    card.classList.add('processing');
+    
     try {
-        debugLog("Fetching distributor name for:", email);
+        debugLog(`🔄 Processing ${action} for order: ${orderId}`);
+        
+        let updateData = {};
+        
+        switch (action) {
+            case 'accept':
+                if (!confirm(`Accept this delivery order?\n\nOrder #${orderId.substring(orderId.length - 8)}`)) {
+                    throw new Error('Action cancelled by user');
+                }
+                
+                updateData = {
+                    status: 'accepted',
+                    acceptedTimestamp: new Date(),
+                    acceptedBy: currentDistributorEmail,
+                    acceptedLat: lat,
+                    acceptedLon: lon
+                };
+                break;
+                
+            case 'complete':
+                if (!confirm(`Mark this delivery as completed?\n\nOrder #${orderId.substring(orderId.length - 8)}`)) {
+                    throw new Error('Action cancelled by user');
+                }
+                
+                updateData = {
+                    status: 'completed',
+                    completedTimestamp: new Date(),
+                    completedBy: currentDistributorEmail,
+                    deliveryDistance: calculateDistance(lat, lon, lat, lon)
+                };
+                break;
+                
+            case 'cancel':
+                if (!confirm(`Cancel this order?\n\nThis action cannot be undone.\nOrder #${orderId.substring(orderId.length - 8)}`)) {
+                    throw new Error('Action cancelled by user');
+                }
+                
+                updateData = {
+                    status: 'cancelled',
+                    cancelledTimestamp: new Date(),
+                    cancelledBy: currentDistributorEmail,
+                    cancellationReason: 'Distributor declined'
+                };
+                break;
+                
+            default:
+                throw new Error(`Unknown action: ${action}`);
+        }
+        
+        // Update Firestore
+        await updateDoc(doc(db, "orders", orderId), updateData);
+        
+        // Show success
+        button.textContent = '✅ Done!';
+        button.style.background = '#28a745';
+        
+        // Update UI immediately
+        if (card) {
+            const statusSpan = card.querySelector('.order-status');
+            if (statusSpan) {
+                statusSpan.textContent = action.toUpperCase();
+                statusSpan.className = `order-status status-${action}`;
+            }
+            
+            // Update button text
+            if (action === 'accept') {
+                button.textContent = '🚚 Mark Delivered';
+                button.className = 'order-action btn-complete';
+                button.onclick = () => handleOrderAction(orderId, 'complete', lat, lon);
+            } else if (action === 'complete' || action === 'cancel') {
+                button.textContent = action === 'complete' ? '✅ Delivered' : '❌ Cancelled';
+                button.className = 'order-action btn-disabled';
+                button.disabled = true;
+                button.onclick = null;
+            }
+        }
+        
+        // Success message
+        const message = `✅ ${action === 'accept' ? 'Order accepted!' : 
+                        action === 'complete' ? 'Delivery completed!' : 
+                        'Order cancelled.'}`;
+        
+        setTimeout(() => {
+            alert(message);
+        }, 500);
+        
+        debugLog(`✅ ${action} successful for order: ${orderId}`);
+        
+    } catch (error) {
+        console.error(`❌ ${action} failed:`, error);
+        alert(`❌ Failed to ${action} order.\n\n${error.message}\nPlease try again.`);
+        
+        // Reset button
+        button.textContent = originalText;
+        button.disabled = isDisabled;
+        button.classList.remove('loading');
+        
+    } finally {
+        // Remove processing state
+        card.classList.remove('processing');
+        setTimeout(() => {
+            button.classList.remove('loading');
+        }, 300);
+    }
+}
+
+// Expose global functions for onclick handlers
+window.handleOrderAction = handleOrderAction;
+window.acceptOrder = (orderId, lat, lon) => handleOrderAction(orderId, 'accept', lat, lon);
+window.completeOrder = (orderId) => handleOrderAction(orderId, 'complete');
+window.cancelOrder = (orderId) => handleOrderAction(orderId, 'cancel');
+
+// Check distributor registration status
+async function checkDistributorStatus(email) {
+    if (!email) return { registered: false };
+    
+    try {
         const docId = email.replace(/[^a-zA-Z0-9._%+-@]/g, "_");
         const docRef = doc(db, "distributors", docId);
         const docSnap = await getDoc(docRef);
         
         if (docSnap.exists()) {
-            const name = docSnap.data().name;
-            console.log("✅ Distributor found:", name);
-            return name;
+            const data = docSnap.data();
+            return {
+                registered: true,
+                name: data.name,
+                mobile: data.mobile,
+                location: data.location,
+                status: data.status || 'active'
+            };
         }
-        console.log("❌ No distributor found for email:", email);
-        return null;
+        return { registered: false };
     } catch (error) {
-        console.error("❌ Error fetching distributor:", error);
-        return null;
+        console.error("❌ Error checking distributor status:", error);
+        return { registered: false, error: error.message };
     }
 }
 
-// Update distributor button text
+// Update distributor button
 async function updateDistributorButton() {
-    const registrationLink = document.querySelector("#distributor");
-    const logoutLink = document.querySelector("#logout");
+    const distributorBtn = document.querySelector("#distributor");
+    const logoutBtn = document.querySelector("#logout");
     
-    if (!registrationLink) {
-        console.log("❌ Distributor button not found");
-        return;
-    }
+    if (!distributorBtn) return;
     
     const email = localStorage.getItem("registeredDistributorEmail");
-    console.log("🔍 Checking distributor status for email:", email);
     
     if (!email) {
-        registrationLink.textContent = "Register as Distributor";
-        registrationLink.style.display = "inline-block";
-        if (logoutLink) logoutLink.style.display = "none";
+        distributorBtn.textContent = "🚚 Register as Distributor";
+        distributorBtn.className = "distributor-btn";
+        if (logoutBtn) logoutBtn.style.display = "none";
         return;
     }
     
-    try {
-        const name = await fetchDistributorName(email);
-        if (name) {
-            registrationLink.textContent = `Welcome, ${name}`;
-            registrationLink.style.display = "inline-block";
-            if (logoutLink) logoutLink.style.display = "inline-block";
-        } else {
-            registrationLink.textContent = "Register as Distributor";
-            registrationLink.style.display = "inline-block";
-            if (logoutLink) logoutLink.style.display = "none";
-            localStorage.removeItem("registeredDistributorEmail");
-        }
-    } catch (error) {
-        console.error("❌ Error updating distributor button:", error);
-        registrationLink.textContent = "Register as Distributor";
-        if (logoutLink) logoutLink.style.display = "none";
+    const status = await checkDistributorStatus(email);
+    
+    if (status.registered && status.name) {
+        distributorBtn.innerHTML = `👋 Welcome, ${status.name}`;
+        distributorBtn.className = "distributor-btn active";
+        if (logoutBtn) logoutBtn.style.display = "inline-block";
+    } else {
+        localStorage.removeItem("registeredDistributorEmail");
+        distributorBtn.textContent = "🚚 Register as Distributor";
+        distributorBtn.className = "distributor-btn";
+        if (logoutBtn) logoutBtn.style.display = "none";
     }
 }
 
-// Fetch all distributor locations
-async function fetchAllDistributorLocations() {
-    try {
-        console.log("🔍 Fetching all distributors...");
-        const snapshot = await getDocs(collection(db, "distributors"));
-        const locations = [];
-        
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            console.log("📍 Found distributor:", data.name, data.email);
-            
-            if (data.location && 
-                typeof data.location.lati === "number" && 
-                typeof data.location.long === "number" && 
-                data.mobile && 
-                data.email) {
-                
-                locations.push({
-                    id: doc.id,
-                    email: data.email,
-                    name: data.name,
-                    mobile: data.mobile,
-                    lati: data.location.lati,
-                    long: data.location.long
-                });
-            }
-        });
-        
-        console.log(`✅ Found ${locations.length} valid distributors`);
-        return locations;
-    } catch (error) {
-        console.error("❌ Error fetching distributors:", error);
-        return [];
+// Handle distributor navigation
+async function handleDistributorClick(e) {
+    e.preventDefault();
+    const email = localStorage.getItem("registeredDistributorEmail");
+    
+    if (!email) {
+        window.location.href = "distributorRegistration.html";
+        return;
+    }
+    
+    const status = await checkDistributorStatus(email);
+    
+    if (status.registered) {
+        window.location.href = "distributorDashboard.html";
+    } else {
+        localStorage.removeItem("registeredDistributorEmail");
+        window.location.href = "distributorRegistration.html";
     }
 }
 
-// Calculate distance using Haversine formula (in kilometers)
+// Calculate distance
 function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Earth's radius in km
+    const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -178,835 +322,535 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
+// Get location
+async function getLocation(type = 'user') {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error("Geolocation not supported"));
+            return;
+        }
+
+        const overlay = document.createElement('div');
+        overlay.id = 'location-overlay';
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.8); z-index: 9999; display: flex; 
+            align-items: center; justify-content: center; color: white;
+        `;
+        overlay.innerHTML = `
+            <div style="text-align: center; padding: 2rem; max-width: 300px;">
+                <div style="width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.3); 
+                            border-top: 4px solid white; border-radius: 50%; 
+                            animation: spin 1s linear infinite; margin: 0 auto 1rem;"></div>
+                <h3>${type === 'distributor' ? 'Setting up delivery area...' : 'Finding your location...'}</h3>
+                <p>Please allow location access</p>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                resolve({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy,
+                    timestamp: new Date()
+                });
+            },
+            (error) => {
+                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                reject(new Error(`Location error: ${error.message}`));
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+        );
+    });
+}
+
+// Fetch distributors
+async function fetchDistributors() {
+    try {
+        const snapshot = await getDocs(collection(db, "distributors"));
+        const distributors = [];
+        
+        snapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.location && data.status === "active" && data.mobile) {
+                const lat = data.location.lati || data.location.latitude;
+                const lng = data.location.long || data.location.longitude;
+                if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+                    distributors.push({
+                        id: doc.id,
+                        email: data.email,
+                        name: data.name,
+                        mobile: data.mobile,
+                        lat: parseFloat(lat),
+                        lng: parseFloat(lng),
+                        radius: parseFloat(data.deliveryRadius) || 15
+                    });
+                }
+            }
+        });
+        
+        return distributors;
+    } catch (error) {
+        console.error("❌ Error fetching distributors:", error);
+        return [];
+    }
+}
+
 // Find nearest distributor
 async function findNearestDistributor(userLat, userLon) {
     try {
-        const distributors = await fetchAllDistributorLocations();
+        const distributors = await fetchDistributors();
         if (distributors.length === 0) {
-            console.log("❌ No distributors found in database");
-            return null;
+            throw new Error("No active distributors available");
         }
-
+        
         let nearest = null;
         let minDistance = Infinity;
-
+        
         for (const dist of distributors) {
-            const distance = calculateDistance(userLat, userLon, dist.lati, dist.long);
-            console.log(`📏 Distance to ${dist.name}: ${distance.toFixed(2)} km`);
-            
-            if (distance < minDistance) {
+            const distance = calculateDistance(userLat, userLon, dist.lat, dist.lng);
+            if (distance <= (dist.radius || 15) && distance < minDistance) {
                 minDistance = distance;
                 nearest = dist;
             }
         }
-
-        if (nearest) {
-            console.log(`✅ Nearest: ${nearest.name} at ${minDistance.toFixed(2)} km`);
+        
+        if (!nearest) {
+            throw new Error("No distributors available in your area");
         }
         
         return nearest;
     } catch (error) {
-        console.error("❌ Error finding nearest distributor:", error);
+        console.error("❌ Error finding distributor:", error);
+        throw error;
+    }
+}
+
+// Place order
+async function placeOrder(userLocation, distributor) {
+    try {
+        const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const distance = calculateDistance(userLocation.latitude, userLocation.longitude, distributor.lat, distributor.lng);
+        
+        const orderData = {
+            customerLocation: userLocation,
+            product: "20L Purified Water Bottle",
+            price: 30,
+            distributorId: distributor.id,
+            distributorEmail: distributor.email,
+            distributorName: distributor.name,
+            distributorMobile: distributor.mobile,
+            customerName: "Express Customer",
+            status: "pending",
+            orderTimestamp: new Date(),
+            orderId: orderId,
+            deliveryDistance: distance
+        };
+        
+        await setDoc(doc(db, "orders", orderId), orderData);
+        return { success: true, orderId, ...orderData };
+    } catch (error) {
+        console.error("❌ Error placing order:", error);
+        throw error;
+    }
+}
+
+// FIXED: Initialize dashboard
+function initializeDashboard() {
+    const ordersList = document.getElementById("orders-list");
+    const statsBar = document.getElementById("stats-bar");
+    const messageDiv = document.getElementById("dashboard-message");
+    
+    if (!ordersList) {
+        console.error("❌ Orders container not found");
         return null;
     }
-}
-
-// Get distributor location
-let getDistributorLocation = async () => {
-    return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-            console.error("❌ Geolocation not supported");
-            alert("Geolocation is not supported by your browser.");
-            reject(new Error("Geolocation not supported"));
+    
+    currentDistributorEmail = localStorage.getItem("registeredDistributorEmail");
+    if (!currentDistributorEmail) {
+        ordersList.innerHTML = `
+            <div class="no-orders">
+                <h3>👋 Welcome to Dashboard</h3>
+                <p>Please <a href="index.html#distributor" style="color: #667eea;">register as a distributor</a> to view orders.</p>
+            </div>
+        `;
+        return null;
+    }
+    
+    debugLog("Initializing dashboard for:", currentDistributorEmail);
+    
+    // Show loading
+    ordersList.innerHTML = `
+        <div class="loading-orders">
+            <div class="loading-spinner"></div>
+            <h3>🔄 Loading orders...</h3>
+            <p>Connecting to delivery network</p>
+        </div>
+    `;
+    
+    if (messageDiv) messageDiv.style.display = "none";
+    
+    // Set up listener
+    const q = query(collection(db, "orders"), where("distributorEmail", "==", currentDistributorEmail));
+    
+    dashboardUnsubscribe = onSnapshot(q, (snapshot) => {
+        debugLog(`📦 Received ${snapshot.size} orders`);
+        
+        if (snapshot.empty) {
+            ordersList.innerHTML = `
+                <div class="no-orders">
+                    <div style="font-size: 4rem; margin-bottom: 1rem; opacity: 0.3;">📦</div>
+                    <h3>No Orders Yet</h3>
+                    <p style="font-size: 1.1rem;">You don't have any pending orders right now.</p>
+                    <p style="opacity: 0.8; font-size: 0.95rem;">Orders will appear here automatically when customers place them.</p>
+                </div>
+            `;
+            if (statsBar) statsBar.style.display = "none";
             return;
         }
-
-        const loadingIndicator = document.createElement("div");
-        loadingIndicator.id = "location-loading";
-        loadingIndicator.innerHTML = "📍 Getting your location...";
-        loadingIndicator.style.cssText = `
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9); color: white; padding: 20px;
-            border-radius: 8px; font-size: 1.1rem; z-index: 10000;
-            text-align: center; min-width: 200px;
-        `;
-        document.body.appendChild(loadingIndicator);
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const location = {
-                    lati: position.coords.latitude,
-                    long: position.coords.longitude,
-                    timestamp: new Date()
-                };
-                console.log("✅ Distributor location:", location);
-                if (document.getElementById("location-loading")) {
-                    document.getElementById("location-loading").remove();
-                }
-                resolve(location);
-            },
-            (error) => {
-                console.error(`❌ Geolocation error: ${error.message}`);
-                alert(`Location access failed: ${error.message}. Please enable location services.`);
-                if (document.getElementById("location-loading")) {
-                    document.getElementById("location-loading").remove();
-                }
-                reject(error);
-            },
-            { 
-                timeout: 30000, 
-                enableHighAccuracy: true, 
-                maximumAge: 0 
+        
+        // Process orders
+        const orders = [];
+        let total = 0, pending = 0, completed = 0, revenue = 0;
+        
+        snapshot.forEach((doc) => {
+            const order = doc.data();
+            total++;
+            orders.push({ id: doc.id, ...order });
+            
+            const orderStatus = order.status || 'pending';
+            if (orderStatus === 'pending') pending++;
+            if (orderStatus === 'completed') {
+                completed++;
+                revenue += order.price || 30;
             }
-        );
-    });
-};
-
-// Get user location
-let getUserLocation = async () => {
-    return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-            console.error("❌ Geolocation not supported");
-            alert("Geolocation is not supported by your browser.");
-            reject(new Error("Geolocation not supported"));
-            return;
-        }
-
-        const loadingIndicator = document.createElement("div");
-        loadingIndicator.id = "location-loading";
-        loadingIndicator.innerHTML = "📍 Getting your location...";
-        loadingIndicator.style.cssText = `
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9); color: white; padding: 20px;
-            border-radius: 8px; font-size: 1.1rem; z-index: 10000;
-            text-align: center; min-width: 200px;
-        `;
-        document.body.appendChild(loadingIndicator);
-
-        // Try cached location first
-        const storedLocation = localStorage.getItem("customerLocation");
-        if (storedLocation) {
-            try {
-                const customerLoc = JSON.parse(storedLocation);
-                if (customerLoc.latitude && customerLoc.longitude) {
-                    const age = Date.now() - new Date(customerLoc.timestamp).getTime();
-                    if (age < 24 * 60 * 60 * 1000) { // 24 hours
-                        console.log("✅ Using cached location:", customerLoc);
-                        if (document.getElementById("location-loading")) {
-                            document.getElementById("location-loading").remove();
-                        }
-                        resolve(customerLoc);
-                        return;
-                    }
-                }
-            } catch (e) {
-                console.log("❌ Invalid cached location");
-            }
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const userLoc = {
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                    timestamp: new Date()
-                };
-                localStorage.setItem("customerLocation", JSON.stringify(userLoc));
-                console.log("✅ User location saved:", userLoc);
-                if (document.getElementById("location-loading")) {
-                    document.getElementById("location-loading").remove();
-                }
-                resolve(userLoc);
-            },
-            (error) => {
-                console.error(`❌ Geolocation error: ${error.message}`);
-                alert(`Location access failed: ${error.message}. Please enable location services.`);
-                if (document.getElementById("location-loading")) {
-                    document.getElementById("location-loading").remove();
-                }
-                reject(error);
-            },
-            { 
-                timeout: 30000, 
-                enableHighAccuracy: true, 
-                maximumAge: 0 
-            }
-        );
-    });
-};
-
-// Page navigation
-let changepage = () => {
-    console.log("➡️ Redirecting to distributorRegistration.html");
-    window.location.href = "distributorRegistration.html";
-};
-
-let changepage2 = () => {
-    console.log("➡️ Redirecting to index.html");
-    window.location.href = "index.html";
-};
-
-// Order management functions
-async function acceptOrder(orderId, lat, lon) {
-    try {
-        console.log(`✅ Accepting order ${orderId}`);
-        await updateDoc(doc(db, "orders", orderId), {
-            status: "accepted",
-            acceptedTimestamp: new Date(),
-            acceptedBy: localStorage.getItem("registeredDistributorEmail")
         });
-        alert("✅ Order accepted! Prepare for delivery.");
-    } catch (error) {
-        handleError(error, "Accept order");
-        alert("❌ Failed to accept order. Please try again.");
-    }
+        
+        // Update stats
+        if (statsBar) {
+            statsBar.style.display = "grid";
+            document.getElementById('total-orders').textContent = total;
+            document.getElementById('pending-orders').textContent = pending;
+            document.getElementById('completed-orders').textContent = completed;
+            document.getElementById('revenue').textContent = `₹${revenue}`;
+        }
+        
+        // Render orders
+        renderOrders(orders);
+        
+    }, (error) => {
+        console.error("❌ Dashboard error:", error);
+        ordersList.innerHTML = `
+            <div class="no-orders" style="color: #dc3545;">
+                <h3>❌ Connection Error</h3>
+                <p>Unable to load orders.</p>
+                <p style="font-size: 0.9rem; opacity: 0.8;">${error.message}</p>
+                <button onclick="location.reload()" style="background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 1rem;">
+                    🔄 Retry
+                </button>
+            </div>
+        `;
+        if (messageDiv) {
+            messageDiv.textContent = `Error: ${error.message}`;
+            messageDiv.style.display = "block";
+        }
+    });
+    
+    return dashboardUnsubscribe;
 }
 
-async function completeOrder(orderId) {
-    try {
-        console.log(`✅ Completing order ${orderId}`);
-        await updateDoc(doc(db, "orders", orderId), {
-            status: "completed",
-            completedTimestamp: new Date(),
-            completedBy: localStorage.getItem("registeredDistributorEmail")
-        });
-        alert("✅ Delivery completed! Great job!");
-    } catch (error) {
-        handleError(error, "Complete order");
-        alert("❌ Failed to complete order. Please try again.");
-    }
-}
-
-async function cancelOrder(orderId) {
-    if (confirm("Are you sure you want to cancel this order?")) {
-        try {
-            console.log(`❌ Cancelling order ${orderId}`);
-            await updateDoc(doc(db, "orders", orderId), {
-                status: "cancelled",
-                cancelledTimestamp: new Date(),
-                cancelledBy: localStorage.getItem("registeredDistributorEmail")
-            });
-            alert("❌ Order cancelled.");
-        } catch (error) {
-            handleError(error, "Cancel order");
-            alert("❌ Failed to cancel order. Please try again.");
+// IMPROVED: Render orders
+function renderOrders(orders) {
+    const ordersList = document.getElementById("orders-list");
+    if (!ordersList || orders.length === 0) return;
+    
+    debugLog(`Rendering ${orders.length} orders`);
+    
+    let html = '';
+    
+    orders.forEach((order) => {
+        const { id, customerLocation, product, price, status, orderTimestamp, customerName } = order;
+        const lat = customerLocation?.latitude || 0;
+        const lon = customerLocation?.longitude || 0;
+        const isValidLocation = lat && lon && !isNaN(lat) && !isNaN(lon);
+        
+        const time = orderTimestamp ? 
+            new Date(orderTimestamp.toDate ? orderTimestamp.toDate() : orderTimestamp).toLocaleString() : 
+            'Unknown';
+        
+        const statusClass = `status-${status || 'pending'}`;
+        const statusText = (status || 'PENDING').toUpperCase();
+        
+        const popupContent = `
+            <b>Delivery Location</b><br>
+            📦 ${product || 'Water Bottle'}<br>
+            💰 ₹${price || 30}<br>
+            👤 ${customerName || 'Customer'}<br>
+            📍 ${lat.toFixed(4)}, ${lon.toFixed(4)}
+        `;
+        
+        html += `
+            <div class="order-card" data-order-id="${id}">
+                <div class="order-header">
+                    <div class="order-id">Order #${id.substring(id.length - 8)}</div>
+                    <span class="order-status ${statusClass}">${statusText}</span>
+                </div>
+                
+                <div class="order-details">
+                    <div class="detail-group">
+                        <p><strong>📦 Product:</strong> ${product || 'Water Bottle'}</p>
+                        <p><strong>💰 Price:</strong> ₹${price || 30}</p>
+                        <p><strong>👤 Customer:</strong> ${customerName || 'Customer'}</p>
+                        <p><strong>⏰ Time:</strong> ${time}</p>
+                    </div>
+                    <div class="detail-group">
+                        <p><strong>📍 Location:</strong></p>
+                        <p style="font-size: 0.9em; color: #666;">
+                            ${isValidLocation ? `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}` : 'Location unavailable'}
+                        </p>
+                    </div>
+                </div>
+                
+                <div id="map-${id}" class="map-container"></div>
+                
+                <div class="action-buttons">
+                    ${status === 'pending' ? `
+                        <button class="order-action btn-accept" data-action="accept" data-order-id="${id}" data-lat="${lat}" data-lon="${lon}">
+                            ✅ Accept Order
+                        </button>
+                        <button class="order-action btn-cancel" data-action="cancel" data-order-id="${id}">
+                            ❌ Decline
+                        </button>
+                    ` : status === 'accepted' ? `
+                        <button class="order-action btn-complete" data-action="complete" data-order-id="${id}">
+                            🚚 Mark Delivered
+                        </button>
+                        <button class="order-action btn-cancel" data-action="cancel" data-order-id="${id}">
+                            ❌ Cancel
+                        </button>
+                    ` : status === 'completed' ? `
+                        <button class="order-action btn-disabled" disabled>
+                            ✅ Delivered
+                        </button>
+                    ` : status === 'cancelled' ? `
+                        <button class="order-action btn-disabled" disabled>
+                            ❌ Cancelled
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        
+        // Initialize map if valid location
+        if (isValidLocation) {
+            setTimeout(() => {
+                initializeMap(`map-${id}`, lat, lon, popupContent);
+            }, 200);
         }
-    }
+    });
+    
+    ordersList.innerHTML = html;
+    
+    // FIXED: Add event listeners to buttons
+    const actionButtons = ordersList.querySelectorAll('.order-action[data-action]');
+    actionButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const action = this.dataset.action;
+            const orderId = this.dataset.orderId;
+            const lat = parseFloat(this.dataset.lat) || 0;
+            const lon = parseFloat(this.dataset.lon) || 0;
+            
+            handleOrderAction(orderId, action, lat, lon);
+        });
+    });
+    
+    debugLog(`✅ Rendered ${orders.length} orders with ${actionButtons.length} action buttons`);
 }
 
 // Main initialization
 document.addEventListener("DOMContentLoaded", async () => {
-    console.log("🚀 Water is Life app initialized!");
+    debugLog("🚀 Water is Life - Initializing...");
     
-    // Update distributor button if it exists
+    // Update distributor button
     if (document.querySelector("#distributor")) {
         await updateDistributorButton();
+        const distributorBtn = document.querySelector("#distributor");
+        if (distributorBtn) {
+            distributorBtn.addEventListener("click", handleDistributorClick);
+        }
     }
-
+    
+    // Logout
+    const logoutBtn = document.querySelector("#logout");
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            localStorage.removeItem("registeredDistributorEmail");
+            alert("👋 Logged out successfully!");
+            window.location.href = "index.html";
+        });
+    }
+    
     // Buy buttons
     const buyButtons = document.querySelectorAll(".add-to-cart");
-    console.log(`🛒 Found ${buyButtons.length} buy buttons`);
-    
-    buyButtons.forEach((button, index) => {
+    buyButtons.forEach((button) => {
         button.addEventListener("click", async () => {
-            console.log(`🛒 Buy button ${index + 1} clicked`);
             try {
-                const originalText = button.textContent;
-                button.textContent = "Processing...";
                 button.disabled = true;
+                button.textContent = "Processing...";
                 
-                const userLoc = await getUserLocation();
-                const nearestDistributor = await findNearestDistributor(userLoc.latitude, userLoc.longitude);
+                const userLocation = await getLocation('user');
+                const distributor = await findNearestDistributor(userLocation.latitude, userLocation.longitude);
+                const orderResult = await placeOrder(userLocation, distributor);
                 
-                if (!nearestDistributor) {
-                    alert("❌ No distributors available in your area. Please try again later or contact support.");
-                    console.log("❌ No distributors found");
-                    button.textContent = originalText;
-                    button.disabled = false;
-                    return;
-                }
-                
-                if (!/^[0-9]{10}$/.test(nearestDistributor.mobile)) {
-                    alert("⚠️ Invalid contact number for distributor. Please contact support.");
-                    console.log("❌ Invalid mobile:", nearestDistributor.mobile);
-                    button.textContent = originalText;
-                    button.disabled = false;
-                    return;
-                }
-                
-                const product = "20L Purified Water Bottle";
-                const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-                
-                // Save order to Firestore
-                console.log("💾 Saving order to Firestore...");
-                await setDoc(doc(db, "orders", orderId), {
-                    customerLocation: {
-                        latitude: userLoc.latitude,
-                        longitude: userLoc.longitude,
-                        timestamp: userLoc.timestamp
-                    },
-                    product: product,
-                    price: 30,
-                    distributorEmail: nearestDistributor.email,
-                    distributorName: nearestDistributor.name,
-                    distributorMobile: nearestDistributor.mobile,
-                    customerName: "Customer", // You can add customer details later
-                    status: "pending",
-                    orderTimestamp: new Date(),
-                    orderId: orderId
-                });
-                
-                console.log("✅ Order saved successfully:", orderId);
-                
-                // Calculate distance for display
                 const distance = calculateDistance(
-                    userLoc.latitude, userLoc.longitude,
-                    nearestDistributor.lati, nearestDistributor.long
+                    userLocation.latitude, userLocation.longitude,
+                    distributor.lat, distributor.lng
                 );
                 
-                const successMessage = `✅ Order placed successfully!\n\n` +
-                    `📦 Product: ${product}\n` +
-                    `💰 Price: ₹30\n` +
-                    `🚚 Distributor: ${nearestDistributor.name}\n` +
-                    `📱 Mobile: ${nearestDistributor.mobile}\n` +
-                    `📍 Distance: ${distance.toFixed(1)} km\n\n` +
-                    `Order #${orderId.substring(0, 8)} will be processed shortly!`;
+                alert(`✅ Order placed!\n\n📦 ${orderResult.product}\n💰 ₹${orderResult.price}\n🚚 ${distributor.name}\n📍 ${distance.toFixed(1)} km\n\nOrder #${orderResult.orderId.slice(-8)}`);
                 
-                alert(successMessage);
-                
-                button.textContent = "✅ Order Placed!";
-                button.style.background = "#28a745";
+                button.textContent = "✅ Ordered!";
                 setTimeout(() => {
-                    button.textContent = originalText;
-                    button.style.background = "";
-                    button.disabled = false;
-                }, 3000);
-                
-            } catch (error) {
-                handleError(error, "Buy button");
-                button.textContent = "Try Again";
-                button.disabled = false;
-                setTimeout(() => {
-                    button.textContent = "Buy Now";
+                    button.textContent = "🛒 Buy Now";
                     button.disabled = false;
                 }, 2000);
+                
+            } catch (error) {
+                alert(`❌ ${error.message}`);
+                button.textContent = "🛒 Buy Now";
+                button.disabled = false;
             }
         });
     });
-
-    // CTA button (WhatsApp)
-    const ctaButton = document.querySelector("#cta-button");
-    if (ctaButton) {
-        ctaButton.addEventListener("click", () => {
-            console.log("📱 WhatsApp CTA clicked");
-            const phoneNumber = "+916299694236";
-            const message = encodeURIComponent("Hello! I'd like to order 20L purified water for immediate delivery. 💧📦");
-            const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-            window.open(whatsappUrl, '_blank');
-        });
-    }
-
-    // Distributor registration link
-    const registrationLink = document.querySelector("#distributor");
-    if (registrationLink) {
-        registrationLink.addEventListener("click", async (e) => {
-            const email = localStorage.getItem("registeredDistributorEmail");
-            if (email) {
-                e.preventDefault();
-                console.log("👤 Already registered distributor, going to dashboard");
-                alert(`👋 Welcome back!\n\nRedirecting to your dashboard...`);
-                window.location.href = "distributorDashboard.html";
-            } else {
-                console.log("➡️ Going to registration page");
-                changepage();
-            }
-        });
-    }
-
-    // Logout functionality
-    const logoutLink = document.querySelector("#logout");
-    if (logoutLink) {
-        logoutLink.addEventListener("click", (e) => {
-            e.preventDefault();
-            localStorage.removeItem("registeredDistributorEmail");
-            const registrationLink = document.querySelector("#distributor");
-            if (registrationLink) {
-                registrationLink.textContent = "Register as Distributor";
-                registrationLink.style.display = "inline-block";
-            }
-            logoutLink.style.display = "none";
-            console.log("👋 User logged out");
-            alert("👋 You have been logged out successfully!");
-        });
-    }
-
+    
     // Contact form
     const contactForm = document.getElementById("contact-form");
     if (contactForm) {
         contactForm.addEventListener("submit", async (e) => {
             e.preventDefault();
-            console.log("📧 Contact form submitted");
-            
             const name = document.getElementById("name").value.trim();
             const email = document.getElementById("email").value.trim();
-            const submitButton = contactForm.querySelector("button[type='submit']");
+            const button = contactForm.querySelector("button");
             
             if (!name || !email) {
-                alert("❌ Please fill in all fields.");
-                return;
-            }
-            
-            if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
-                alert("❌ Please enter a valid email address.");
+                alert("Please fill all fields");
                 return;
             }
             
             try {
-                const originalText = submitButton.textContent;
-                submitButton.textContent = "Sending...";
-                submitButton.disabled = true;
+                button.disabled = true;
+                button.textContent = "Sending...";
                 
                 const docId = email.replace(/[^a-zA-Z0-9._%+-@]/g, "_");
                 await setDoc(doc(db, "contacts", docId), {
-                    name: name,
-                    email: email,
-                    message: "Contact form submission",
-                    timestamp: new Date(),
-                    source: "website"
+                    name, email, timestamp: new Date()
                 });
                 
-                console.log("✅ Contact saved:", { name, email });
-                alert(`✅ Thank you, ${name}!\n\nWe'll contact you at ${email} within 24 hours.`);
+                alert(`✅ Thank you, ${name}! We'll contact you soon.`);
                 contactForm.reset();
                 
             } catch (error) {
-                handleError(error, "Contact form");
-                alert("❌ Failed to send message. Please try again or contact us directly.");
+                alert("❌ Failed to send message");
             } finally {
-                submitButton.textContent = "Send Message";
-                submitButton.disabled = false;
+                button.disabled = false;
+                button.textContent = "📧 Send Message";
             }
         });
     }
-
+    
     // Distributor registration form
     const distributorForm = document.getElementById("distributor-form");
     if (distributorForm) {
-        console.log("📝 Setting up distributor registration form");
-        
         distributorForm.addEventListener("submit", async (e) => {
             e.preventDefault();
-            console.log("📝 Distributor form submitted");
             
             const name = document.getElementById("distributor-name").value.trim();
             const email = document.getElementById("distributor-email").value.trim();
             const mobile = document.getElementById("distributor-mobile").value.trim();
-            const submitButton = document.getElementById("registration-submit");
+            const submitBtn = document.getElementById("registration-submit");
             
-            // Validation
             if (!name || !email || !mobile) {
-                alert("❌ Please fill in all fields.");
-                return;
-            }
-            
-            if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
-                alert("❌ Please enter a valid email address.");
+                alert("Please fill all fields");
                 return;
             }
             
             if (!/^[0-9]{10}$/.test(mobile)) {
-                alert("❌ Please enter a valid 10-digit mobile number.");
+                alert("Please enter valid 10-digit mobile number");
                 return;
             }
             
             try {
-                // Show loading
-                const originalText = submitButton.textContent;
-                submitButton.textContent = "Registering...";
-                submitButton.disabled = true;
+                submitBtn.disabled = true;
+                submitBtn.textContent = "Registering...";
                 
-                // Get location
-                console.log("📍 Getting distributor location...");
-                const location = await getDistributorLocation();
-                
-                // Check if email exists
-                const docId = email.replace(/[^a-zA-Z0-9._%+-@]/g, "_");
-                const docRef = doc(db, "distributors", docId);
-                const docSnap = await getDoc(docRef);
-                
-                if (docSnap.exists()) {
-                    alert("❌ This email is already registered. Please use a different email.");
-                    console.log("❌ Duplicate email:", email);
-                    submitButton.textContent = originalText;
-                    submitButton.disabled = false;
+                // Check if already registered
+                const existing = await checkDistributorStatus(email);
+                if (existing.registered) {
+                    alert("This email is already registered");
                     return;
                 }
                 
-                // Save distributor
-                console.log("💾 Saving distributor data...");
-                await setDoc(docRef, {
-                    name: name,
-                    email: email,
-                    mobile: mobile,
+                const location = await getLocation('distributor');
+                const docId = email.replace(/[^a-zA-Z0-9._%+-@]/g, "_");
+                
+                await setDoc(doc(db, "distributors", docId), {
+                    name, email, mobile,
                     location: {
-                        lati: location.lati,
-                        long: location.long,
+                        lati: location.latitude,
+                        long: location.longitude,
                         timestamp: location.timestamp
                     },
-                    registrationTimestamp: new Date(),
                     status: "active",
-                    deliveryRadius: 10 // km
+                    registrationTimestamp: new Date()
                 });
                 
-                console.log("✅ Distributor registered successfully:", { name, email, mobile });
-                
-                // Save to localStorage
                 localStorage.setItem("registeredDistributorEmail", email);
-                
-                alert(`✅ Welcome aboard, ${name}!\n\nYour distributor registration is complete.\nRedirecting to dashboard...`);
-                
-                // Reset form and redirect
-                distributorForm.reset();
-                setTimeout(() => {
-                    changepage2();
-                }, 1500);
+                alert(`✅ Welcome, ${name}!\nRegistration complete!`);
+                window.location.href = "distributorDashboard.html";
                 
             } catch (error) {
-                handleError(error, "Distributor registration");
-                alert(`❌ Registration failed: ${error.message}\nPlease try again.`);
+                alert(`❌ ${error.message}`);
             } finally {
-                submitButton.textContent = "Register Now";
-                submitButton.disabled = false;
+                submitBtn.disabled = false;
+                submitBtn.textContent = "🚀 Register Now";
             }
         });
     }
-
-    // DISTRIBUTOR DASHBOARD - Fixed orders listener
-    const ordersList = document.getElementById("orders-list");
-    if (ordersList) {
-        console.log("📋 Initializing distributor dashboard");
-        
-        const email = localStorage.getItem("registeredDistributorEmail");
-        console.log("🔍 Distributor email from localStorage:", email);
-        
-        if (!email) {
-            ordersList.innerHTML = `
-                <div class="order-card" style="text-align: center; color: #666; padding: 40px;">
-                    <h3>👋 Welcome to Dashboard</h3>
-                    <p>Please <a href="index.html#distributor" style="color: #007bff;">register as a distributor</a> to view orders.</p>
-                </div>
-            `;
-            return;
-        }
-        
-        // Show loading
-        ordersList.innerHTML = `
-            <div class="order-card" style="text-align: center; padding: 40px;">
-                <h3>🔄 Loading your orders...</h3>
-                <p>Fetching orders for ${email}</p>
-            </div>
-        `;
-        
-        // Test basic Firestore access first
-        try {
-            console.log("🧪 Testing Firestore connection...");
-            const testSnapshot = await getDocs(collection(db, "orders"));
-            console.log(`✅ Firestore test passed - found ${testSnapshot.size} total orders`);
-        } catch (testError) {
-            console.error("❌ Firestore connection test failed:", testError);
-            ordersList.innerHTML = `
-                <div class="order-card" style="text-align: center; color: #dc3545; padding: 40px;">
-                    <h3>❌ Database Connection Error</h3>
-                    <p>Unable to connect to orders database.</p>
-                    <p><small>Error: ${handleError(testError, "Firestore test")}</small></p>
-                    <button onclick="location.reload()" style="margin-top: 10px; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">🔄 Retry</button>
-                </div>
-            `;
-            return;
-        }
-        
-        // Try to get orders with multiple strategies
-        let unsubscribe = null;
-        
-        // Strategy 1: Try exact email match
-        try {
-            console.log("🔍 Strategy 1: Querying orders with exact email match...");
-            const q = query(
-                collection(db, "orders"),
-                where("distributorEmail", "==", email)
-            );
-            
-            unsubscribe = onSnapshot(q, 
-                (snapshot) => {
-                    console.log(`📦 Strategy 1 - Orders snapshot: ${snapshot.size} orders`);
-                    renderOrders(snapshot, email);
-                },
-                (error) => {
-                    console.error("❌ Strategy 1 listener error:", error);
-                    // Try fallback strategy
-                    setupFallbackOrdersListener(email);
-                }
-            );
-            
-            console.log("✅ Strategy 1 listener set up");
-            
-        } catch (queryError) {
-            console.error("❌ Strategy 1 setup failed:", queryError);
-            setupFallbackOrdersListener(email);
-        }
-        
-        // Fallback strategy - get ALL orders and filter client-side
-        function setupFallbackOrdersListener(distributorEmail) {
-            console.log("🔄 Strategy 2: Using fallback listener (all orders, client-side filter)");
-            
-            const fallbackUnsubscribe = onSnapshot(
-                collection(db, "orders"),
-                (snapshot) => {
-                    console.log(`📦 Fallback - Total orders: ${snapshot.size}, filtering for ${distributorEmail}`);
-                    const filteredOrders = [];
-                    
-                    snapshot.forEach((doc) => {
-                        const orderData = doc.data();
-                        if (orderData.distributorEmail === distributorEmail) {
-                            filteredOrders.push({ id: doc.id, ...orderData });
-                        }
-                    });
-                    
-                    console.log(`📦 Fallback - Found ${filteredOrders.length} matching orders`);
-                    renderOrdersFiltered(filteredOrders);
-                },
-                (error) => {
-                    console.error("❌ Fallback listener error:", error);
-                    ordersList.innerHTML = `
-                        <div class="order-card" style="text-align: center; color: #dc3545; padding: 40px;">
-                            <h3>❌ Failed to Load Orders</h3>
-                            <p>Unable to fetch orders from database.</p>
-                            <p><small>Error: ${handleError(error, "Orders listener")}</small></p>
-                            <button onclick="location.reload()" style="margin-top: 10px; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">🔄 Retry</button>
-                        </div>
-                    `;
-                }
-            );
-            
-            // Clean up previous listener if it exists
-            if (unsubscribe) {
-                unsubscribe();
-            }
-        }
-        
-        // Render orders from snapshot
-        function renderOrders(snapshot, distributorEmail) {
-            console.log(`🎨 Rendering ${snapshot.size} orders`);
-            
-            if (snapshot.empty) {
-                ordersList.innerHTML = `
-                    <div class="order-card" style="text-align: center; color: #666; padding: 40px;">
-                        <h3>📭 No Orders Yet</h3>
-                        <p>You have no pending orders at the moment.</p>
-                        <p><small>Orders will appear here when customers place them for ${distributorEmail}</small></p>
-                    </div>
-                `;
-                return;
-            }
-            
-            let html = '';
-            let mapPromises = [];
-            
-            snapshot.forEach((doc) => {
-                const order = doc.data();
-                const orderId = doc.id;
-                const lat = order.customerLocation?.latitude || 0;
-                const lon = order.customerLocation?.longitude || 0;
-                
-                console.log(`📦 Processing order ${orderId}:`, { status: order.status, lat, lon });
-                
-                if (!lat || !lon || isNaN(lat) || isNaN(lon)) {
-                    console.warn(`⚠️ Skipping order ${orderId} - invalid coordinates:`, { lat, lon });
-                    return;
-                }
-                
-                const orderTime = order.orderTimestamp ? 
-                    new Date(order.orderTimestamp.toDate ? order.orderTimestamp.toDate() : order.orderTimestamp).toLocaleString() : 
-                    'Unknown time';
-                
-                const statusStyle = order.status === 'completed' ? 'color: #28a745' : 
-                                  order.status === 'cancelled' ? 'color: #dc3545' : 
-                                  'color: #ffc107';
-                
-                html += `
-                    <div class="order-card">
-                        <h3>Order #${orderId.substring(0, 8)}${order.orderId ? ` (${order.orderId.substring(0, 8)})` : ''}</h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <p><strong>📦 Product:</strong> ${order.product || 'Water Bottle'}</p>
-                                <p><strong>💰 Price:</strong> ₹${order.price || 30}</p>
-                                <p><strong>👤 Customer:</strong> ${order.customerName || 'Customer'}</p>
-                            </div>
-                            <div>
-                                <p><strong>📍 Location:</strong></p>
-                                <p style="font-size: 0.9em; color: #666;">${lat.toFixed(6)}, ${lon.toFixed(6)}</p>
-                                <p><strong>⏰ Time:</strong> ${orderTime}</p>
-                                <p><strong>📊 Status:</strong> 
-                                    <span style="${statusStyle}; font-weight: bold;">${order.status?.toUpperCase() || 'PENDING'}</span>
-                                </p>
-                            </div>
-                        </div>
-                        
-                        <div id="map-${orderId}" class="map-container" style="height: 250px; margin: 15px 0; border: 2px solid #dee2e6; border-radius: 5px;"></div>
-                        
-                        <div style="text-align: center; margin-top: 15px;">
-                            ${order.status === 'pending' ? `
-                                <button class="order-action" onclick="acceptOrder('${orderId}', ${lat}, ${lon})" 
-                                        style="background: #28a745; color: white; padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer;">
-                                    ✅ Accept Order
-                                </button>
-                                <button class="order-action" onclick="cancelOrder('${orderId}')" 
-                                        style="background: #dc3545; color: white; padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer;">
-                                    ❌ Cancel
-                                </button>
-                            ` : order.status === 'accepted' ? `
-                                <button class="order-action" onclick="completeOrder('${orderId}')" 
-                                        style="background: #17a2b8; color: white; padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer;">
-                                    🚚 Complete Delivery
-                                </button>
-                            ` : `
-                                <button class="order-action" disabled 
-                                        style="background: #6c757d; color: white; padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: not-allowed;">
-                                    ✓ ${order.status?.toUpperCase()}
-                                </button>
-                            `}
-                        </div>
-                    </div>
-                `;
-                
-                // Queue map initialization
-                mapPromises.push(
-                    new Promise((resolve) => {
-                        setTimeout(() => {
-                            initializeMap(`map-${orderId}`, lat, lon, 
-                                `📍 Delivery Location<br>${order.product}<br>₹${order.price || 30}<br>${order.customerName || 'Customer'}`);
-                            resolve();
-                        }, 100);
-                    })
-                );
-            });
-            
-            ordersList.innerHTML = html;
-            
-            // Wait for all maps to initialize
-            Promise.all(mapPromises).then(() => {
-                console.log("✅ All maps initialized");
-            }).catch((error) => {
-                console.error("❌ Some maps failed to initialize:", error);
-            });
-        }
-        
-        // Render filtered orders for fallback
-        function renderOrdersFiltered(orders) {
-            console.log(`🎨 Rendering ${orders.length} filtered orders`);
-            
-            if (orders.length === 0) {
-                ordersList.innerHTML = `
-                    <div class="order-card" style="text-align: center; color: #666; padding: 40px;">
-                        <h3>📭 No Orders Yet</h3>
-                        <p>You have no pending orders at the moment.</p>
-                        <p><small>Orders will appear here when customers place them</small></p>
-                    </div>
-                `;
-                return;
-            }
-            
-            let html = '';
-            orders.forEach((order) => {
-                const orderId = order.id;
-                const lat = order.customerLocation?.latitude || 0;
-                const lon = order.customerLocation?.longitude || 0;
-                
-                if (!lat || !lon || isNaN(lat) || isNaN(lon)) {
-                    console.warn(`⚠️ Skipping filtered order ${orderId} - invalid coordinates`);
-                    return;
-                }
-                
-                const orderTime = order.orderTimestamp ? 
-                    new Date(order.orderTimestamp.toDate ? order.orderTimestamp.toDate() : order.orderTimestamp).toLocaleString() : 
-                    'Unknown time';
-                
-                const statusStyle = order.status === 'completed' ? 'color: #28a745' : 
-                                  order.status === 'cancelled' ? 'color: #dc3545' : 
-                                  'color: #ffc107';
-                
-                html += `
-                    <div class="order-card">
-                        <h3>Order #${orderId.substring(0, 8)}</h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <p><strong>📦 Product:</strong> ${order.product || 'Water Bottle'}</p>
-                                <p><strong>💰 Price:</strong> ₹${order.price || 30}</p>
-                                <p><strong>👤 Customer:</strong> ${order.customerName || 'Customer'}</p>
-                            </div>
-                            <div>
-                                <p><strong>📍 Location:</strong></p>
-                                <p style="font-size: 0.9em; color: #666;">${lat.toFixed(6)}, ${lon.toFixed(6)}</p>
-                                <p><strong>⏰ Time:</strong> ${orderTime}</p>
-                                <p><strong>📊 Status:</strong> 
-                                    <span style="${statusStyle}; font-weight: bold;">${order.status?.toUpperCase() || 'PENDING'}</span>
-                                </p>
-                            </div>
-                        </div>
-                        
-                        <div id="map-${orderId}" class="map-container" style="height: 250px; margin: 15px 0; border: 2px solid #dee2e6; border-radius: 5px;"></div>
-                        
-                        <div style="text-align: center; margin-top: 15px;">
-                            ${order.status === 'pending' ? `
-                                <button class="order-action" onclick="acceptOrder('${orderId}', ${lat}, ${lon})" 
-                                        style="background: #28a745; color: white; padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer;">
-                                    ✅ Accept Order
-                                </button>
-                                <button class="order-action" onclick="cancelOrder('${orderId}')" 
-                                        style="background: #dc3545; color: white; padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer;">
-                                    ❌ Cancel
-                                </button>
-                            ` : order.status === 'accepted' ? `
-                                <button class="order-action" onclick="completeOrder('${orderId}')" 
-                                        style="background: #17a2b8; color: white; padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer;">
-                                    🚚 Complete Delivery
-                                </button>
-                            ` : `
-                                <button class="order-action" disabled 
-                                        style="background: #6c757d; color: white; padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: not-allowed;">
-                                    ✓ ${order.status?.toUpperCase()}
-                                </button>
-                            `}
-                        </div>
-                    </div>
-                `;
-                
-                // Initialize map
-                setTimeout(() => {
-                    initializeMap(`map-${orderId}`, lat, lon, 
-                        `📍 Delivery Location<br>${order.product}<br>₹${order.price || 30}<br>${order.customerName || 'Customer'}`);
-                }, 100);
-            });
-            
-            ordersList.innerHTML = html;
-        }
+    
+    // WhatsApp CTA
+    const ctaButton = document.querySelector("#cta-button");
+    if (ctaButton) {
+        ctaButton.addEventListener("click", () => {
+            const message = encodeURIComponent("Hello! I'd like to order 20L purified water.");
+            window.open(`https://wa.me/+916299694236?text=${message}`, '_blank');
+        });
     }
-
-    // Hamburger menu
+    
+    // FIXED: Initialize dashboard
+    if (document.getElementById("orders-list")) {
+        initializeDashboard();
+    }
+    
+    // Mobile menu
     const hamburger = document.querySelector('.hamburger');
     const navList = document.querySelector('.nav-list');
     if (hamburger && navList) {
         hamburger.addEventListener('click', () => {
-            const isExpanded = hamburger.getAttribute('aria-expanded') === 'true';
-            hamburger.setAttribute('aria-expanded', !isExpanded);
             navList.classList.toggle('active');
         });
     }
-
-    // Expose global functions
-    window.acceptOrder = acceptOrder;
-    window.completeOrder = completeOrder;
-    window.cancelOrder = cancelOrder;
     
-    console.log("🎉 All components initialized successfully!");
+    debugLog("🎉 App initialization complete!");
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    if (dashboardUnsubscribe) {
+        dashboardUnsubscribe();
+    }
 });
