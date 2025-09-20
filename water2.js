@@ -296,7 +296,7 @@ async function handleDistributorClick(e) {
     const email = localStorage.getItem("registeredDistributorEmail");
     
     if (!email) {
-        window.location.href = "distributorRegistration.html";
+        window.location.href = "distributorregistration.html";
         return;
     }
     
@@ -306,7 +306,7 @@ async function handleDistributorClick(e) {
         window.location.href = "distributorDashboard.html";
     } else {
         localStorage.removeItem("registeredDistributorEmail");
-        window.location.href = "distributorRegistration.html";
+        window.location.href = "distributorregistration.html";
     }
 }
 
