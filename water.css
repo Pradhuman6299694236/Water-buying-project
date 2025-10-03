@@ -299,15 +299,13 @@ header {
     height: 250px;
     overflow: hidden;
     position: relative;
-    object-fit: cover;
 }
 
 .product-image {
     width: 100%;
-    height: 145%;
+    height: 100%;
     object-fit: cover;
     transition: transform 0.4s ease;
-    padding: 1rem;
 }
 
 .product-card:hover .product-image {
@@ -701,6 +699,12 @@ header {
     padding: 4rem 1rem;
     background-color: #f9f9f9;
     text-align: center;
+    opacity: 1; /* Hidden until observed */
+    transition: opacity 0.5s ease-in;
+}
+
+.stats-section.visible {
+    opacity: 1; /* Fade in when observed */
 }
 
 .stats-section .container {
@@ -738,17 +742,11 @@ header {
     font-weight: bold;
     color: #007bff;
     margin-bottom: 0.5rem;
-    animation: fadeIn 1s ease-in;
 }
 
 .stat-label {
     font-size: 1.2rem;
     color: #666;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
 }
 
 /* Responsive Adjustments */
