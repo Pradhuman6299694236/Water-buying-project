@@ -3,267 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Distributor Registration - Water is Life</title>
+    <title>Water is Life - Pure Water Delivery</title>
     <link rel="stylesheet" href="water.css">
-    <style>
-        .registration-wrapper {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-        }
-        
-        .registration-container {
-            background: white;
-            padding: 2.5rem;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 450px;
-            position: relative;
-        }
-        
-        .registration-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        
-        .registration-header .icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .registration-header h1 {
-            color: #2c3e50;
-            margin-bottom: 0.5rem;
-            font-size: 2rem;
-        }
-        
-        .registration-header p {
-            color: #7f8c8d;
-            font-size: 1.1rem;
-            line-height: 1.5;
-        }
-        
-        .form-group {
-            margin-bottom: 1.5rem;
-            position: relative;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #2c3e50;
-            font-weight: 600;
-            font-size: 0.95rem;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: 14px 16px;
-            border: 2px solid #e1e8ed;
-            border-radius: 10px;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            background: #f8f9fa;
-        }
-        
-        .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
-            background: white;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        .form-group input.error {
-            border-color: #e74c3c;
-            background: #fdf2f2;
-        }
-        
-        .form-group .error-message {
-            color: #e74c3c;
-            font-size: 0.85rem;
-            margin-top: 0.25rem;
-            display: none;
-        }
-        
-        .form-group .error-message.show {
-            display: block;
-        }
-        
-        .location-notice {
-            background: linear-gradient(90deg, #e3f2fd 0%, #e8f5e8 100%);
-            border: 1px solid #2196f3;
-            border-radius: 10px;
-            padding: 1rem;
-            margin: 1.5rem 0;
-            color: #1565c0;
-            font-size: 0.95rem;
-            display: flex;
-            align-items: center;
-        }
-        
-        .location-notice::before {
-            content: "📍";
-            font-size: 1.2rem;
-            margin-right: 0.5rem;
-        }
-        
-        .submit-btn {
-            width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-top: 1.5rem;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .submit-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
-        }
-        
-        .submit-btn:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .submit-btn .loading-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: white;
-            animation: spin 1s linear infinite;
-            margin-right: 10px;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        .message {
-            padding: 1rem;
-            border-radius: 10px;
-            margin: 1.5rem 0;
-            text-align: center;
-            font-weight: 500;
-        }
-        
-        .success-message {
-            background: linear-gradient(90deg, #d4edda 0%, #c8e6c9 100%);
-            color: #2e7d32;
-            border: 1px solid #a5d6a7;
-        }
-        
-        .error-message {
-            background: linear-gradient(90deg, #ffcdd2 0%, #ef9a9a 100%);
-            color: #c62828;
-            border: 1px solid #e57373;
-        }
-        
-        .back-link {
-            display: inline-block;
-            margin-top: 1.5rem;
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.3s ease;
-        }
-        
-        .back-link:hover {
-            color: #5a67d8;
-            text-decoration: underline;
-        }
-        
-        @media (max-width: 480px) {
-            .registration-container {
-                margin: 10px;
-                padding: 2rem 1.5rem;
-            }
-            
-            .registration-header h1 {
-                font-size: 1.6rem;
-            }
-            
-            .location-notice {
-                flex-direction: column;
-                text-align: center;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <meta name="description" content="Order pure, purified water delivered to your door in minutes. Fast, reliable water delivery service.">
 </head>
 <body>
-    <div class="registration-wrapper">
-        <div class="registration-container">
-            <div class="registration-header">
-                <div class="icon">🚚</div>
-                <h1>Join as Distributor</h1>
-                <p>Start earning by delivering pure water to your community. Join our network today!</p>
-            </div>
+    <!-- Header -->
+    <header>
+        <nav class="navbar">
+            <a href="index.html" class="logo">
+                <img src="logo.jpeg" alt="Water is Life Logo" class="logo-image" />
+            </a>
             
-            <form id="distributor-form">
-                <div class="form-group">
-                    <label for="distributor-name">Full Name *</label>
-                    <input type="text" id="distributor-name" name="distributor-name" 
-                           placeholder="Enter your full name" required>
-                    <div class="error-message" id="name-error">Please enter your full name</div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="distributor-email">Email Address *</label>
-                    <input type="email" id="distributor-email" name="distributor-email" 
-                           placeholder="Enter your email address" required>
-                    <div class="error-message" id="email-error">Please enter a valid email address</div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="distributor-mobile">Mobile Number *</label>
-                    <input type="tel" id="distributor-mobile" name="distributor-mobile" 
-                           placeholder="Enter 10-digit mobile number" 
-                           pattern="[0-9]{10}" maxlength="10" required>
-                    <div class="error-message" id="mobile-error">Please enter a valid 10-digit mobile number</div>
-                </div>
-                
-                <div class="location-notice">
-                    <span>We'll automatically detect your location to set up your delivery area (15km radius)</span>
-                </div>
-                
-                <div id="success-message" class="message success-message">
-                    ✅ Registration successful! Setting up your account...
-                </div>
-                
-                <div id="error-message" class="message error-message">
-                    ❌ Registration failed. Please try again.
-                </div>
-                
-                <button type="submit" id="registration-submit" class="submit-btn">
-                    <span id="button-text">🚀 Register Now</span>
-                    <span id="loading-spinner" class="loading-spinner" style="display: none;"></span>
-                </button>
-            </form>
+            <button id="distributor" class="distributor-btn">🚚 Register as Distributor</button>
+            <button id="logout" class="logout-btn" style="display: none;">🚪 Logout</button>
             
-            <div style="text-align: center; margin-top: 1.5rem;">
-                <a href="index.html" class="back-link">← Back to Home</a>
+            <button class="hamburger" aria-expanded="false" aria-controls="nav-list">☰</button>
+            <ul id="nav-list" class="nav-list">
+                <li><a href="#home">Home</a></li>
+                <li><a href="#products">Products</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="hero-content">
+            <h1>🌊 Welcome to Blue Drop</h1>
+            <p>Pure, Purified Water Delivered at One Click</p>
+            <button id="cta-button" class="cta-btn">📱 Book via WhatsApp</button>
+            <p id="quote" class="hero-quote">"Save water today, or tomorrow you'll pay."</p>
+        </div>
+    </section>
+
+    <!-- Products Section -->
+    <section id="products" class="products-section">
+        <div class="container">
+            <h2>Our Products</h2>
+            <div class="product-grid">
+                <div class="product-card">
+                    <div class="product-image-container">
+                        <img src="bottle1.jpeg" alt="20L Purified Water Bottle" class="product-image" />
+                    </div>
+                    <div class="product-info">
+                        <h3>20L Purified Water</h3>
+                        <p>Best quality purified and chilled water for your family</p>
+                        <div class="price-section">
+                            <span class="price">₹30</span>
+                            <span class="original-price">₹40</span>
+                        </div>
+                        <button class="add-to-cart btn-primary">🛒 Buy Now</button>
+                    </div>
+                </div>
+
+                <div class="product-card">
+                    <div class="product-image-container">
+                        <img src="bottle2.jpeg" alt="20L Premium Water Bottle" class="product-image" />
+                    </div>
+                    <div class="product-info">
+                        <h3>20L Premium Water</h3>
+                        <p>Mineral-rich purified water with advanced filtration</p>
+                        <div class="price-section">
+                            <span class="price">₹30</span>
+                            <span class="original-price">₹40</span>
+                        </div>
+                        <button class="add-to-cart btn-primary">🛒 Buy Now</button>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
+    </section>
 
+    <!-- Features Section -->
+    <section id="features" class="features-section">
+        <div class="container">
+            <h2>Why Choose Us?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🚀</div>
+                    <h3>Instant Booking</h3>
+                    <p>Book water anytime, anywhere with just one click. No waiting, no hassle.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Fast Delivery</h3>
+                    <p>Get your water delivered within 15-30 minutes. Lightning-fast service.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>24/7 Support</h3>
+                    <p>Round-the-clock customer support for all your water delivery needs.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact-section">
+        <div class="container">
+            <h2>Get In Touch</h2>
+            <form id="contact-form" class="contact-form">
+                <div class="form-group">
+                    <input type="text" id="name" placeholder="Your Name" required>
+                </div>
+                <div class="form-group">
+                    <input type="email" id="email" placeholder="Your Email" required>
+                </div>
+                <button type="submit" class="btn-primary">📧 Send Message</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 Water is Life. Bringing purity to every home. All rights reserved.</p>
+            <p class="footer-links">
+                <a href="#privacy">Privacy Policy</a> | 
+                <a href="#terms">Terms of Service</a> | 
+                <a href="#contact">Contact Us</a>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="water2.js"></script>
 </body>
 </html>
